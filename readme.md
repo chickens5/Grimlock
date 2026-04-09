@@ -2,9 +2,7 @@
 
 A full-stack web application for plant research with genotype/phenotype tracking and ML-ready data architecture.
 
-/Grimlock
-run backend first: npm run dev:server
-frontend: npm run dev
+
 ## Project Overview
 
 Grimlock is designed for plant breeders and researchers to:
@@ -30,12 +28,15 @@ Grimlock/
 ├── index.jsx                 # Main app entry
 ├── index.html               # HTML template
 ├── vite.config.js          # Vite configuration
+├── .env                    # Environment variables (create locally — not committed)
 ├── src/
 │   ├── pages/
 │   │   ├── Home.jsx        # Homepage with aurora background
 │   │   ├── Home.css
 │   │   ├── Plants.jsx      # Plant research database page
-│   │   └── Plants.css
+│   │   ├── Plants.css
+│   │   ├── Concentrates.jsx # Vape & concentrates database page
+│   │   └── Concentrates.css
 │   └── components/
 │       ├── SoftAurora.jsx   # WebGL aurora animation
 │       └── SoftAurora.css
@@ -43,18 +44,20 @@ Grimlock/
 │   ├── server.js           # Express server entry
 │   ├── models/
 │   │   ├── Plant.js
+│   │   ├── Concentrate.js
 │   │   ├── Observation.js
 │   │   ├── GrowCycle.js
 │   │   ├── LabResult.js
 │   │   └── MLDataset.js
 │   ├── routes/
 │   │   ├── plants.js
-│   │   └── observations.js
+│   │   ├── observations.js
+│   │   └── concentrates.js
 │   ├── controllers/
 │   │   ├── plantController.js
-│   │   └── observationController.js
+│   │   ├── observationController.js
+│   │   └── concentrateController.js
 │   └── seed.js             # Sample data generator
-├── .env                    # Environment variables (create locally)
 └── package.json            # Dependencies & scripts
 ```
 
@@ -62,8 +65,24 @@ Grimlock/
 
 ### Prerequisites
 - Node.js 16+
-- MongoDB (local or Atlas connection string)
+- MongoDB 6+ locally **or** a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster
+- mongodump / mongorestore (included with [MongoDB Database Tools](https://www.mongodb.com/try/download/database-tools)) — only needed for data migration
 
+
+## Quick Start
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Create .env (see Environment section below)
+
+# 3. Run backend first, then frontend in a separate terminal
+npm run dev:server   # → http://localhost:5000
+npm run dev          # → http://localhost:5173
+
+# Or run both together
+npm run dev:all
+```
 ### Installation
 
 1. **Install dependencies**
@@ -71,39 +90,73 @@ Grimlock/
    npm install
    ```
 
-2. **Configure environment**
-   - Copy `.env.example` to `.env`
-   - Update `MONGODB_URI` with your MongoDB connection string
-   ```env
-   MONGODB_URI=mongodb://localhost:27017/grimlock
-   PORT=5000
-   ```
+2. **Create `.env` in the project root**
+  ```env
+  MONGODB_URI=mongodb://localhost:27017/grimlock
+  PORT=5000
+  ```
+  For Atlas, replace the URI with your connection string from the Atlas dashboard.
 
-3. **Seed sample data (optional)**
-   ```bash
-   node server/seed.js
-   ```
+---
 
-### Running the Application
+## Copying to a New Machine (with Existing Data)
 
-**Option 1: Run frontend only**
+There are two ways to bring your data along. Atlas is recommended — no extra steps needed.
+
+### Option A — MongoDB Atlas (Recommended)
+
+Atlas stores data in the cloud, so any machine pointing at the same cluster has the full dataset instantly.
+
+1. Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas)
+2. In Atlas → **Database Access**: create a user with read/write permissions
+3. In Atlas → **Network Access**: add `0.0.0.0/0` (or your specific IP)
+4. Click **Connect → Drivers** and copy the connection string
+5. On **every machine** set `.env`:
+  ```env
+  MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/grimlock
+  PORT=5000
+  ```
+6. Clone/copy the project folder, run `npm install`, then `npm run dev:all`
+
+That's it — all machines share the same live data.
+
+---
+
+### Option B — Local MongoDB with Export/Import
+
+Use this if you want to move data between local MongoDB installs.
+
+#### On the source machine — export the data
 ```bash
-npm run dev
+# Dump the entire grimlock database to a local folder
+mongodump --db grimlock --out ./grimlock-backup
 ```
-Vite dev server: http://localhost:5173
+This creates `./grimlock-backup/grimlock/` containing `.bson` + `.json` files for each collection.
 
-**Option 2: Run backend only**
-```bash
-npm run dev:server
-```
-Express server: http://localhost:5000
+#### Transfer the folder
+Copy `grimlock-backup/` and the entire `Grimlock/` project to the new machine via USB, zip, or cloud storage.
 
-**Option 3: Run both (requires `concurrently`)**
+#### On the new machine — import the data
 ```bash
-npm run dev:all
+# Make sure mongod is running first, then restore
+mongorestore --db grimlock ./grimlock-backup/grimlock
 ```
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:5000/api
+
+#### Then start the app normally
+```bash
+npm install
+npm run dev:server   # terminal 1
+npm run dev          # terminal 2
+```
+
+---
+
+### What is NOT committed to the repo
+| File / Folder | Why |
+|---|---|
+| `.env` | Contains your DB credentials — create it manually on each machine |
+| `node_modules/` | Rebuilt via `npm install` |
+| `grimlock-backup/` | Your exported data dump — keep it safe separately |
 
 ## API Endpoints
 
@@ -120,32 +173,77 @@ npm run dev:all
 - `PUT /api/observations/:id` - Update observation
 - `DELETE /api/observations/:id` - Delete observation
 
+### Concentrates
+- `GET /api/concentrates` - Get all concentrates
+- `GET /api/concentrates/:id` - Get concentrate by ID
+- `GET /api/concentrates/vibe-clusters` - Get VIBE cluster reference data
+- `POST /api/concentrates` - Create concentrate
+- `PUT /api/concentrates/:id` - Update concentrate
+- `DELETE /api/concentrates/:id` - Delete concentrate
+
 ## MongoDB Schemas
 
 ### Plant
-```javascript
+```json
 {
-  uid: String (unique),
-  genotype: {
-    strain_name, breeder, lineage, ploidy, sex, chemotype
-  },
-  tags: [String],
-  notes: String,
-  created_at: Date
+  "uid": "King Louie",
+  "product_name": "King Louie",
+  "breeder": "Tree1Four",
+  "type": "Flower",
+  "vibe_cluster": "The Funk",
+  "lineage": ["OG Kush x L.A. Confidential"],
+  "batch_number": "KL13-2026-03",
+  "strain_image": "<image url>",
+  "terpene": []
 }
 ```
+`terpene` auto-populates from the VIBE cluster map when left empty.
+
+### Concentrate
+```json
+{
+  "uid": "KL13-03-2026",
+  "product_name": "King Louie XIII Diamonds & Sauce",
+  "type": "Diamond & Sauce",
+  "batch_number": "13",
+  "vibe_cluster": "The Funk",
+  "lab_url": "<tagleaf coa url>",
+  "lineage": ["OG Kush x L.A. Confidential"],
+  "strain_image": "<image url>",
+  "terpenes": {
+    "primary_drivers": ["β-Caryophyllene", "D-limonene"],
+    "tasting_notes": ["Gas", "Dough", "Sour", "Cake"]
+  },
+  "potency": {
+    "thc_percentage": 70.20,
+    "cbd_percentage": 0.2816,
+    "total_terpenes": 6.219
+  }
+}
+```
+`terpenes` auto-populates from the VIBE cluster map when omitted.
+
+
+### VIBE Cluster Reference
+| Cluster | Primary Terpenes | Tasting Notes |
+|---|---|---|
+| The Funk | β-Caryophyllene, D-limonene | Gas, Dough, Sour, Cake |
+| The Juice | Ocimene, Linalool | Fruit, Citrus, Cheese |
+| Floral Sweet | β-Myrcene, α-Pinene | Floral, Candy, Pine |
+| Summer Haze | Terpinolene | Lemon, Cleaner, Sweet |
+| Exotic | Non-Standard Profile | Unique |
 
 ### Observation (Phenotype Time-Series)
-```javascript
+```json
 {
-  plant_id: ObjectId,
-  recorded_at: Date,
-  growth_stage: String,
-  morphology: { height_cm, canopy_width_cm, etc. },
-  health: { overall_score, symptoms, stress_type },
-  environment_snapshot: { vpd, temp, humidity, etc. },
-  media: [{ url, type, ml_labels }],
-  data_quality: Number
+  "plant_id": "ObjectId",
+  "recorded_at": "Date",
+  "growth_stage": "vegetative | flowering | harvest",
+  "morphology": { "height_cm": 0, "canopy_width_cm": 0 },
+  "health": { "overall_score": 0, "symptoms": [], "stress_type": "" },
+  "environment_snapshot": { "vpd": 0, "temp": 0, "humidity": 0 },
+  "media": [{ "url": "", "type": "", "ml_labels": [] }],
+  "data_quality": 0
 }
 ```
 
@@ -153,10 +251,13 @@ npm run dev:all
 
 ### Current
 - Homepage with animated WebGL aurora background
-- Plant research database UI
-- CRUD API for plants and observations
+- Plant research database with 3-column expandable layout
+- Vape & Concentrates database with VIBE cluster filtering
+- CRUD API for plants, concentrates, and observations
+- VIBE Cluster terpene auto-population on insert
+- Lab COA URL linking (TagLeaf LIMS)
+- Strain image display on plant and concentrate cards
 - MongoDB data persistence
-- Sample data seeding
 
 ### Planned
 - Observation form with photo upload

@@ -92,6 +92,35 @@
   padding-bottom: 10px;
 }
 
+.plants-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.strain-filter-btn {
+  border: 1px solid rgba(225, 0, 255, 0.3);
+  background: rgba(30, 30, 50, 0.5);
+  color: #d0d0ff;
+  font-size: 0.78em;
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.strain-filter-btn:hover {
+  border-color: rgba(225, 0, 255, 0.6);
+  color: #e100ff;
+}
+
+.strain-filter-btn.active {
+  background: rgba(225, 0, 255, 0.2);
+  color: #f7f7f7;
+  border-color: rgba(225, 0, 255, 0.7);
+}
+
 .plants-list {
   display: flex;
   flex-direction: column;
@@ -143,6 +172,17 @@
   border-radius: 4px;
   font-size: 0.75em;
   border: 1px solid rgba(225, 0, 255, 0.4);
+}
+
+.strain-status-badge {
+  display: inline-block;
+  background: rgba(100, 200, 255, 0.15);
+  color: #9fd6ff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  border: 1px solid rgba(100, 200, 255, 0.35);
+  margin-right: 6px;
 }
 
 /* MIDDLE - Expanded Details */

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Concentrates.css';
+import { apiUrl } from '../lib/api';
 
 export default function Concentrates({ onNavigateTo }) {
   const [concentrates, setConcetrates] = useState([]);
@@ -16,7 +17,7 @@ export default function Concentrates({ onNavigateTo }) {
 
   const fetchConcentrates = async () => {
     try {
-      const response = await fetch('/api/concentrates');
+      const response = await fetch(apiUrl('/api/concentrates'));
       if (!response.ok) throw new Error('Failed to fetch concentrates');
       const data = await response.json();
       setConcetrates(data);
@@ -29,7 +30,7 @@ export default function Concentrates({ onNavigateTo }) {
 
   const fetchVibeClusterData = async () => {
     try {
-      const response = await fetch('/api/concentrates/vibe-clusters');
+      const response = await fetch(apiUrl('/api/concentrates/vibe-clusters'));
       if (response.ok) {
         const data = await response.json();
         setVibeClusterData(data);
@@ -42,6 +43,10 @@ export default function Concentrates({ onNavigateTo }) {
   const filteredConcentrates = filterCluster === 'all'
     ? concentrates
     : concentrates.filter(c => c.vibe_cluster === filterCluster);
+
+  const selectedConcentrate = expandedId
+    ? filteredConcentrates.find(c => c._id === expandedId) || null
+    : null;
 
   const clusters = ['all', ...Object.keys(vibeClusterData)];
 
@@ -90,12 +95,13 @@ export default function Concentrates({ onNavigateTo }) {
             <p>No concentrates found</p>
           </div>
         ) : (
-          <div className="concentrates-grid">
-            {filteredConcentrates.map(conc => (
-              <div
-                key={conc._id}
-                className={`concentrate-card ${expandedId === conc._id ? 'expanded' : ''}`}
-              >
+          <>
+            <div className="concentrates-grid">
+              {filteredConcentrates.map(conc => (
+                <div
+                  key={conc._id}
+                  className={`concentrate-card ${expandedId === conc._id ? 'selected' : ''}`}
+                >
                 {/* Card Header */}
                 <div className="card-header">
                   <div className="header-top">
@@ -145,134 +151,146 @@ export default function Concentrates({ onNavigateTo }) {
                   className="expand-btn"
                   onClick={() => setExpandedId(expandedId === conc._id ? null : conc._id)}
                 >
-                  {expandedId === conc._id ? '▲ Collapse' : '▼ Details'}
+                  {expandedId === conc._id ? '▲ Hide Details' : '▼ Details'}
                 </button>
+                </div>
+              ))}
+            </div>
 
-                {/* Expanded Content */}
-                {expandedId === conc._id && (
-                  <div className="expanded-section">
-                    {/* Lineage */}
-                    {conc.lineage && conc.lineage.length > 0 && (
-                      <div className="detail-section">
-                        <h4>Lineage</h4>
-                        <p className="lineage">{conc.lineage.join(' × ')}</p>
-                      </div>
-                    )}
+            {selectedConcentrate && (
+              <div className="concentrate-details-panel">
+              <button
+                className="details-close-btn"
+                onClick={() => setExpandedId(null)}
+                aria-label="Close details"
+              >
+                ✕
+              </button>
 
-                    {/* VIBE Cluster Details */}
-                    {conc.vibe_cluster && vibeClusterData[conc.vibe_cluster] && (
-                      <div className="detail-section">
-                        <h4>VIBE Cluster Details</h4>
-                        <div className="cluster-info">
-                          <p>
-                            <strong>Primary Terpenes:</strong>{' '}
-                            {vibeClusterData[conc.vibe_cluster].primary_terpene_drivers.join(', ')}
-                          </p>
-                          <p>
-                            <strong>Tasting Notes:</strong>{' '}
-                            {vibeClusterData[conc.vibe_cluster].tasting_notes.join(', ')}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Terpene Profile */}
-                    {conc.terpenes?.full_profile && conc.terpenes.full_profile.length > 0 && (
-                      <div className="detail-section">
-                        <h4>Terpene Profile</h4>
-                        <div className="terpene-list">
-                          {conc.terpenes.full_profile.map((terp, i) => (
-                            <div key={i} className="terpene-item">
-                              <span className="terpene-name">{terp.name}</span>
-                              <div className="terpene-bar">
-                                <div
-                                  className="terpene-fill"
-                                  style={{ width: `${terp.percentage * 100}%` }}
-                                />
-                              </div>
-                              <span className="terpene-percent">{(terp.percentage * 100).toFixed(1)}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Potency Details */}
-                    {conc.potency && (
-                      <div className="detail-section">
-                        <h4>Potency Analysis</h4>
-                        <div className="potency-details">
-                          {conc.potency.thc_percentage && (
-                            <p><strong>THC:</strong> {conc.potency.thc_percentage}%</p>
-                          )}
-                          {conc.potency.cbd_percentage && (
-                            <p><strong>CBD:</strong> {conc.potency.cbd_percentage}%</p>
-                          )}
-                          {conc.potency.total_terpenes && (
-                            <p><strong>Total Terpenes:</strong> {conc.potency.total_terpenes}%</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-            
-
-                    {/* Batch Info */}
-                    {conc.batch_number && (
-                      <div className="detail-section">
-                        <h4>Batch Information</h4>
-                        <p><strong>Batch #:</strong> {conc.batch_number}</p>
-                      </div>
-                    )}
-
-                    {/* Lab Analysis */}
-                    {conc.lab_url && (
-                      <div className="detail-section">
-                        <h4>Lab Analysis</h4>
-                        <p>
-                          <a 
-                            href={conc.lab_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="lab-url-link"
-                          >
-                            View Certificate of Analysis →
-                          </a>
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Notes */}
-                    {conc.notes && (
-                      <div className="detail-section">
-                        <h4>Notes</h4>
-                        <p className="notes-text">{conc.notes}</p>
-                      </div>
-                    )}
-
-                    {/* Tags */}
-                    {conc.tags && conc.tags.length > 0 && (
-                      <div className="detail-section">
-                        <h4>Tags</h4>
-                        <div className="tags-container">
-                          {conc.tags.map((tag, i) => (
-                            <span key={i} className="tag">{tag}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Date Created */}
-                    <div className="detail-section date-section">
-                      <p className="date-text">
-                        Created: {new Date(conc.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                )}
+              <div className="details-header">
+                <h2>{selectedConcentrate.product_name || selectedConcentrate.uid}</h2>
+                <p className="uid-text">{selectedConcentrate.uid}</p>
+                
               </div>
-            ))}
-          </div>
+
+              {/* Lineage */}
+              {selectedConcentrate.lineage && selectedConcentrate.lineage.length > 0 && (
+                <div className="detail-section">
+                  <h4>Lineage</h4>
+                  <p className="lineage">{selectedConcentrate.lineage.join(' × ')}</p>
+                </div>
+              )}
+
+              {/* VIBE Cluster Details */}
+              {selectedConcentrate.vibe_cluster && vibeClusterData[selectedConcentrate.vibe_cluster] && (
+                <div className="detail-section">
+                  <h4>VIBE Cluster Details</h4>
+                  <div className="cluster-info">
+                    <p>
+                      <strong>Primary Terpenes:</strong>{' '}
+                      {vibeClusterData[selectedConcentrate.vibe_cluster].primary_terpene_drivers.join(', ')}
+                    </p>
+                    <p>
+                      <strong>Tasting Notes:</strong>{' '}
+                      {vibeClusterData[selectedConcentrate.vibe_cluster].tasting_notes.join(', ')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Terpene Profile */}
+              {selectedConcentrate.terpenes?.full_profile && selectedConcentrate.terpenes.full_profile.length > 0 && (
+                <div className="detail-section">
+                  <h4>Terpene Profile</h4>
+                  <div className="terpene-list">
+                    {selectedConcentrate.terpenes.full_profile.map((terp, i) => (
+                      <div key={i} className="terpene-item">
+                        <span className="terpene-name">{terp.name}</span>
+                        <div className="terpene-bar">
+                          <div
+                            className="terpene-fill"
+                            style={{ width: `${terp.percentage * 100}%` }}
+                          />
+                        </div>
+                        <span className="terpene-percent">{(terp.percentage * 100).toFixed(1)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Potency Details */}
+              {selectedConcentrate.potency && (
+                <div className="detail-section">
+                  <h4>Potency Analysis</h4>
+                  <div className="potency-details">
+                    {selectedConcentrate.potency.thc_percentage && (
+                      <p><strong>THC:</strong> {selectedConcentrate.potency.thc_percentage}%</p>
+                    )}
+                    {selectedConcentrate.potency.cbd_percentage && (
+                      <p><strong>CBD:</strong> {selectedConcentrate.potency.cbd_percentage}%</p>
+                    )}
+                    {selectedConcentrate.potency.total_terpenes && (
+                      <p><strong>Total Terpenes:</strong> {selectedConcentrate.potency.total_terpenes}%</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Batch Info */}
+              {selectedConcentrate.batch_number && (
+                <div className="detail-section">
+                  <h4>Batch Information</h4>
+                  <p><strong>Batch #:</strong> {selectedConcentrate.batch_number}</p>
+                </div>
+              )}
+
+              {/* Lab Analysis */}
+              {selectedConcentrate.lab_url && (
+                <div className="detail-section">
+                  <h4>Lab Analysis</h4>
+                  <p>
+                    <a
+                      href={selectedConcentrate.lab_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="lab-url-link"
+                    >
+                      View Certificate of Analysis →
+                    </a>
+                  </p>
+                </div>
+              )}
+
+              {/* Notes */}
+              {selectedConcentrate.notes && (
+                <div className="detail-section">
+                  <h4>Notes</h4>
+                  <p className="notes-text">{selectedConcentrate.notes}</p>
+                </div>
+              )}
+
+              {/* Tags */}
+              {selectedConcentrate.tags && selectedConcentrate.tags.length > 0 && (
+                <div className="detail-section">
+                  <h4>Tags</h4>
+                  <div className="tags-container">
+                    {selectedConcentrate.tags.map((tag, i) => (
+                      <span key={i} className="tag">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Date Created */}
+              <div className="detail-section date-section">
+                <p className="date-text">
+                  Created: {new Date(selectedConcentrate.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

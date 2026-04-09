@@ -11,6 +11,10 @@ const plantSchema = new mongoose.Schema({
   // Product / cultivar fields
   product_name: String,
   breeder: String,
+  strain_status: {
+    type: String,
+    enum: ["R&D", "House", "Premier", "Retired"]
+  },
   type: {
     type: String,
     default: 'Flower'

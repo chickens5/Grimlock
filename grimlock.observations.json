@@ -1,0 +1,54 @@
+{
+  "plant_id": "69d46a4fb40513e13cbec617",
+  "recorded_at": "2026-04-07T14:30:00.000Z",
+  "growth_stage": "flower",
+  "morphology": {
+    "height_cm": 118,
+    "canopy_width_cm": 74,
+    "internode_length_cm": 4.6,
+    "leaf_count": 132,
+    "leaf_shape": "broad serrated",
+    "stem_diameter_mm": 11.8,
+    "cola_count": 9
+  },
+  "health": {
+    "overall_score": 8.7,
+    "symptoms": [
+      {
+        "type": "tip burn",
+        "severity": 3,
+        "location": "upper canopy",
+        "confirmed_by": "Gabriel"
+      }
+    ],
+    "stress_type": ["light stress", "nutrient excess"]
+  },
+  "environment_snapshot": {
+    "vpd_kpa": 1.28,
+    "temp_c": 25.4,
+    "humidity_pct": 57,
+    "co2_ppm": 980,
+    "ppfd_umol": 910,
+    "photoperiod_hrs": 12,
+    "medium": "coco coir",
+    "runoff_ec": 1.7,
+    "runoff_ph": 6.3
+  },
+  "media": [
+    {
+      "url": "https://example.com/observations/plant-01-front.jpg",
+      "type": "rgb",
+      "angle": "front-left",
+      "ml_labels": [
+        {
+          "label": "healthy flower development",
+          "confidence": 0.94,
+          "model_version": "vision-1.2.0",
+          "bounding_box": { "x": 124, "y": 88, "w": 220, "h": 260 }
+        }
+      ]
+    }
+  ],
+  "recorded_by": "Gabe J postman",
+  "data_quality": 9
+}

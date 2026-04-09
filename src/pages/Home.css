@@ -37,6 +37,7 @@
   display: flex;
   gap: 20px;
   justify-content: center;
+  flex-wrap: wrap;
   animation: fadeInUp 1s ease-out 0.4s backwards;
 }
 
@@ -53,6 +54,7 @@
   box-shadow: 0 10px 30px rgba(225, 0, 255, 0.3);
   text-transform: uppercase;
   letter-spacing: 1px;
+  min-width: 240px;
 }
 
 .nav-button:hover {

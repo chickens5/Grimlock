@@ -33,6 +33,12 @@ export default function Home({ onNavigateTo }) {
           >
             Plant Research Database
           </button>
+          <button
+            className="nav-button"
+            onClick={() => onNavigateTo('observations')}
+          >
+            Observations
+          </button>
           <button 
             className="nav-button"
             onClick={() => onNavigateTo('concentrates')}

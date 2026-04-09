@@ -1,9 +1,36 @@
 import Plant from '../models/Plant.js';
 import Observation from '../models/Observation.js';
 
+const ALLOWED_STRAIN_STATUSES = ['R&D', 'House', 'Premier', 'Retired'];
+
 export const getAllPlants = async (req, res, next) => {
   try {
-    const plants = await Plant.find()
+    const { strain_status: strainStatusQuery } = req.query;
+    const filter = {};
+
+    if (typeof strainStatusQuery === 'string' && strainStatusQuery.trim()) {
+      const requestedStatuses = strainStatusQuery
+        .split(',')
+        .map(status => status.trim())
+        .filter(Boolean);
+
+      const invalidStatuses = requestedStatuses.filter(
+        status => !ALLOWED_STRAIN_STATUSES.includes(status)
+      );
+
+      if (invalidStatuses.length > 0) {
+        return res.status(400).json({
+          message: `Invalid strain_status values: ${invalidStatuses.join(', ')}`,
+          allowed: ALLOWED_STRAIN_STATUSES
+        });
+      }
+
+      if (requestedStatuses.length > 0) {
+        filter.strain_status = { $in: requestedStatuses };
+      }
+    }
+
+    const plants = await Plant.find(filter)
       .populate('concentrates')
       .sort({ created_at: -1 });
     res.json(plants);

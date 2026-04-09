@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import Home from './src/pages/Home.jsx';
 import Plants from './src/pages/Plants.jsx';
 import Concentrates from './src/pages/Concentrates.jsx';
+import Observations from './src/pages/Observations.jsx';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -17,6 +18,9 @@ function App() {
       )}
       {currentPage === 'concentrates' && (
         <Concentrates onNavigateTo={setCurrentPage} />
+      )}
+      {currentPage === 'observations' && (
+        <Observations onNavigateTo={setCurrentPage} />
       )}
     </div>
   );

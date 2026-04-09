@@ -1,11 +1,24 @@
 import mongoose from 'mongoose';
 
+const symptomSchema = new mongoose.Schema(
+  {
+    type: { type: String },
+    severity: Number,
+    location: String,
+    confirmed_by: String
+  },
+  { _id: false }
+);
+
 const observationSchema = new mongoose.Schema({
   plant_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Plant',
     required: true
   },
+  
+  observ_img: String,
+
   recorded_at: {
     type: Date,
     default: Date.now
@@ -30,12 +43,7 @@ const observationSchema = new mongoose.Schema({
   // Health & stress
   health: {
     overall_score: Number,
-    symptoms: [{
-      type: String,
-      severity: Number,
-      location: String,
-      confirmed_by: String
-    }],
+    symptoms: [symptomSchema],
     stress_type: [String]
   },
 
@@ -76,5 +84,7 @@ const observationSchema = new mongoose.Schema({
   recorded_by: String,
   data_quality: Number
 });
+
+
 
 export default mongoose.model('Observation', observationSchema);

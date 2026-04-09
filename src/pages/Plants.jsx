@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './Plants.css';
+import { apiUrl } from '../lib/api';
+
+const STRAIN_STATUS_FILTERS = ['all', 'R&D', 'House', 'Premier', 'Retired'];
 
 export default function Plants({ onNavigateTo }) {
   const [plants, setPlants] = useState([]);
@@ -8,19 +11,27 @@ export default function Plants({ onNavigateTo }) {
   const [expandedPlantId, setExpandedPlantId] = useState(null);
   const [concentrates, setConcentrates] = useState([]);
   const [vibeClusterData, setVibeClusterData] = useState({});
+  const [selectedStrainStatus, setSelectedStrainStatus] = useState('all');
 
   useEffect(() => {
     fetchPlants();
     fetchConcentrates();
     fetchVibeClusterData();
-  }, []);
+  }, [selectedStrainStatus]);
 
   const fetchPlants = async () => {
     try {
-      const response = await fetch('/api/plants');
+      const params = new URLSearchParams();
+      if (selectedStrainStatus !== 'all') {
+        params.set('strain_status', selectedStrainStatus);
+      }
+
+      const query = params.toString();
+      const response = await fetch(apiUrl(`/api/plants${query ? `?${query}` : ''}`));
       if (!response.ok) throw new Error('Failed to fetch plants');
       const data = await response.json();
       setPlants(data);
+      setExpandedPlantId(current => (data.some(plant => plant._id === current) ? current : null));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -30,7 +41,7 @@ export default function Plants({ onNavigateTo }) {
 
   const fetchConcentrates = async () => {
     try {
-      const response = await fetch('/api/concentrates');
+      const response = await fetch(apiUrl('/api/concentrates'));
       if (response.ok) {
         const data = await response.json();
         setConcentrates(data);
@@ -42,7 +53,7 @@ export default function Plants({ onNavigateTo }) {
 
   const fetchVibeClusterData = async () => {
     try {
-      const response = await fetch('/api/concentrates/vibe-clusters');
+      const response = await fetch(apiUrl('/api/concentrates/vibe-clusters'));
       if (response.ok) {
         const data = await response.json();
         setVibeClusterData(data);
@@ -83,6 +94,18 @@ export default function Plants({ onNavigateTo }) {
       {/* Left Sidebar - Plant List */}
       <div className="plants-sidebar">
         <h2>Plants</h2>
+        <div className="plants-filter-row">
+          {STRAIN_STATUS_FILTERS.map(status => (
+            <button
+              key={status}
+              type="button"
+              className={`strain-filter-btn ${selectedStrainStatus === status ? 'active' : ''}`}
+              onClick={() => setSelectedStrainStatus(status)}
+            >
+              {status === 'all' ? 'All' : status}
+            </button>
+          ))}
+        </div>
         <div className="plants-list">
           {plants.length === 0 ? (
             <div className="no-plants">
@@ -102,6 +125,9 @@ export default function Plants({ onNavigateTo }) {
                   <h4>{plant.product_name || plant.genotype?.strain_name || 'Unknown Strain'}</h4>
                   <span className="list-item-id">{plant.uid}</span>
                 </div>
+                {plant.strain_status && (
+                  <span className="strain-status-badge">{plant.strain_status}</span>
+                )}
                 {plant.vibe_cluster && plant.vibe_cluster !== 'unclassified' && (
                   <span className="vibe-badge">{plant.vibe_cluster}</span>
                 )}
@@ -132,6 +158,9 @@ export default function Plants({ onNavigateTo }) {
             <div className="section">
               <h3>Genotype</h3>
               <div className="section-content">
+                {expandedPlant.strain_status && (
+                  <p><strong>Status:</strong> {expandedPlant.strain_status}</p>
+                )}
                 {expandedPlant.genotype?.breeder && (
                   <p><strong>Breeder:</strong> {expandedPlant.genotype.breeder}</p>
                 )}
@@ -259,6 +288,7 @@ export default function Plants({ onNavigateTo }) {
           <div className="right-content">
             <h3>Summary</h3>
             <p><strong>UID:</strong> {expandedPlant.uid}</p>
+            <p><strong>Status:</strong> {expandedPlant.strain_status || 'Unknown'}</p>
             <p><strong>Sex:</strong> {expandedPlant.genotype?.sex || 'Unknown'}</p>
             {expandedPlant.vibe_cluster !== 'unclassified' && (
               <p><strong>Cluster:</strong> {expandedPlant.vibe_cluster}</p>
