@@ -11,10 +11,27 @@ const symptomSchema = new mongoose.Schema(
 );
 
 const observationSchema = new mongoose.Schema({
+  har_grp: {
+    type: String,
+    required: true,
+    trim: true,
+    index: true,
+    alias: 'harvest_group'
+  },
   plant_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Plant',
-    required: true
+    type: mongoose.Schema.Types.Mixed,
+    index: true
+  },
+
+  hg_plant_id: {
+    type: String,
+    trim: true,
+    index: true
+  },
+
+  plant_name: {
+    type: String,
+    trim: true
   },
   
   observ_img: String,
@@ -37,7 +54,7 @@ const observationSchema = new mongoose.Schema({
     leaf_count: Number,
     leaf_shape: String,
     stem_diameter_mm: Number,
-    cola_count: Number
+    node_count: Number
   },
 
   // Health & stress
@@ -83,6 +100,22 @@ const observationSchema = new mongoose.Schema({
 
   recorded_by: String,
   data_quality: Number
+});
+
+observationSchema.pre('validate', function normalizeObservationFields(next) {
+  if (this.morphology?.cola_count != null && this.morphology?.node_count == null) {
+    this.morphology.node_count = this.morphology.cola_count;
+  }
+
+  if (!this.hg_plant_id && typeof this.plant_id === 'string') {
+    this.hg_plant_id = this.plant_id;
+  }
+
+  if (this.hg_plant_id && !this.plant_id) {
+    this.plant_id = this.hg_plant_id;
+  }
+
+  next();
 });
 
 

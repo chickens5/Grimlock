@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import plantRoutes from './routes/plants.js';
 import observationRoutes from './routes/observations.js';
 import concentrateRoutes from './routes/concentrates.js';
+import harvestGroupRoutes from './routes/harvest-groups.js';
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ mongoose.connect(mongoUri)
 app.use('/api/plants', plantRoutes);
 app.use('/api/observations', observationRoutes);
 app.use('/api/concentrates', concentrateRoutes);
+app.use('/api/harvest-groups', harvestGroupRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

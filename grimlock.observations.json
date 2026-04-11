@@ -1,4 +1,5 @@
 {
+  "har_grp": "HG-APR-2026-A",
   "plant_id": "69d46a4fb40513e13cbec617",
   "recorded_at": "2026-04-07T14:30:00.000Z",
   "growth_stage": "flower",
@@ -9,7 +10,7 @@
     "leaf_count": 132,
     "leaf_shape": "broad serrated",
     "stem_diameter_mm": 11.8,
-    "cola_count": 9
+    "node_count": 9
   },
   "health": {
     "overall_score": 8.7,
