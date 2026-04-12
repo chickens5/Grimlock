@@ -7,6 +7,8 @@ import plantRoutes from './routes/plants.js';
 import observationRoutes from './routes/observations.js';
 import concentrateRoutes from './routes/concentrates.js';
 import harvestGroupRoutes from './routes/harvest-groups.js';
+import labResultRoutes from './routes/lab-results.js';
+import mlDatasetRoutes from './routes/ml-datasets.js';
 
 dotenv.config();
 
@@ -44,6 +46,8 @@ app.use('/api/plants', plantRoutes);
 app.use('/api/observations', observationRoutes);
 app.use('/api/concentrates', concentrateRoutes);
 app.use('/api/harvest-groups', harvestGroupRoutes);
+app.use('/api/lab-results', labResultRoutes);
+app.use('/api/ml-datasets', mlDatasetRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
