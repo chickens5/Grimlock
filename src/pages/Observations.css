@@ -276,9 +276,10 @@
 }
 
 .header-plant-button {
-  padding: 30px 30px;
+  padding: 16px 16px;
   border-radius: 999px;
   font-size: 1.5rem;
+  margin: 20px;
   border: 1px solid rgba(225, 0, 255, 0.22);
   background: rgba(12, 15, 31, 0.72);
   color: #f3e8ff;
@@ -508,6 +509,96 @@
 
 .selected-hg-actions {
   margin-top: 14px;
+}
+
+/* Tab Navigation */
+.view-mode-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(225, 0, 255, 0.16);
+}
+
+.tab-button {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  color: #a8a8c8;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-button:hover {
+  color: #d0d0ff;
+}
+
+.tab-button.active {
+  color: #f1ecff;
+  border-bottom-color: #b366ff;
+}
+
+/* Plant Selection Dropdowns */
+.selected-plant-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(30, 30, 50, 0.44);
+  border: 1px solid rgba(225, 0, 255, 0.16);
+  border-radius: 12px;
+}
+
+.selected-plant-selection label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #d0d0ff;
+}
+
+.selected-plant-selection select {
+  padding: 10px 12px;
+  background: rgba(20, 20, 35, 0.8);
+  border: 1px solid rgba(225, 0, 255, 0.24);
+  border-radius: 8px;
+  color: #f7f7f7;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selected-plant-selection select:hover {
+  border-color: rgba(225, 0, 255, 0.4);
+  background: rgba(25, 25, 40, 0.9);
+}
+
+.selected-plant-selection select:focus {
+  outline: none;
+  border-color: rgba(225, 0, 255, 0.6);
+  box-shadow: 0 0 12px rgba(225, 0, 255, 0.2);
+}
+
+/* View Containers */
+.observations-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.manage-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+  gap: 20px;
+}
+
+.manage-card {
+  margin-top: 0 !important;
 }
 
 @media (max-width: 1450px) {

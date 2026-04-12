@@ -4,6 +4,7 @@ import Home from './src/pages/Home.jsx';
 import Plants from './src/pages/Plants.jsx';
 import Concentrates from './src/pages/Concentrates.jsx';
 import Observations from './src/pages/Observations.jsx';
+import FlowerProducts from './src/pages/FlowerProducts.jsx';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -21,6 +22,9 @@ function App() {
       )}
       {currentPage === 'observations' && (
         <Observations onNavigateTo={setCurrentPage} />
+      )}
+      {currentPage === 'flower-products' && (
+        <FlowerProducts onNavigateTo={setCurrentPage} />
       )}
     </div>
   );

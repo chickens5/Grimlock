@@ -48,6 +48,12 @@
   box-shadow: 0 0 15px rgba(225, 0, 255, 0.2);
 }
 
+.plants-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .list-strain-image {
   width: 100%;
   height: 80px;
@@ -59,7 +65,7 @@
 
 .expanded-strain-image {
   width: 100%;
-  max-height: 280px;
+  max-height: 666px;
   object-fit: cover;
   border-radius: 10px;
   margin-bottom: 20px;
@@ -75,6 +81,7 @@
   padding: 20px;
   backdrop-filter: blur(10px);
   height: fit-content;
+  min-width: 210px;
   position: sticky;
   top: 20px;
   overflow-y: auto;
@@ -95,6 +102,8 @@
 .plants-filter-row {
   display: flex;
   flex-wrap: wrap;
+  height: fit-content;
+  width: 100%;
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -103,9 +112,9 @@
   border: 1px solid rgba(225, 0, 255, 0.3);
   background: rgba(30, 30, 50, 0.5);
   color: #d0d0ff;
-  font-size: 0.78em;
+  font-size: 2rem;
   border-radius: 999px;
-  padding: 5px 10px;
+  padding: 6px 20px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -259,7 +268,7 @@
 
 .section h3 {
   font-size: 1.1em;
-  margin: 0 0 12px 0;
+  margin: 0 0 4.20px 0;
   color: #d0d0ff;
 }
 
@@ -273,7 +282,7 @@
 }
 
 .section-content strong {
-  color: #e100ff;
+  color: #ffffff;
 }
 
 .terpenes {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './Plants.css';
 import { apiUrl } from '../lib/api';
 
-const STRAIN_STATUS_FILTERS = ['all', 'R&D', 'House', 'Premier', 'Retired'];
+const STRAIN_STATUS_FILTERS = ['all', 'R&D', 'House', 'Premier', 'Retired', 'Unknown'];
 
 export default function Plants({ onNavigateTo }) {
   const [plants, setPlants] = useState([]);
@@ -75,6 +75,12 @@ export default function Plants({ onNavigateTo }) {
     return vibeClusterData[cluster] || null;
   };
 
+  const formatList = (value) => {
+    if (!value) return 'N/A';
+    if (Array.isArray(value)) return value.filter(Boolean).join(', ') || 'N/A';
+    return String(value).trim() || 'N/A';
+  };
+
   if (loading) return <div className="plants-container"><p>Loading plants...</p></div>;
   if (error) return <div className="plants-container"><p className="error">Error: {error}</p></div>;
 
@@ -85,10 +91,15 @@ export default function Plants({ onNavigateTo }) {
         <button className="nav-btn home-btn" onClick={() => onNavigateTo('home')}>
           ← Home
         </button>
-        <div className="nav-title">Cannabaceae Research Database</div>
-        <button className="nav-btn concentrates-btn" onClick={() => onNavigateTo('concentrates')}>
-          Vapes → 
-        </button>
+        <div className="nav-title">Our Cultivars</div>
+        <div className="plants-nav-actions">
+          <button className="nav-btn" onClick={() => onNavigateTo('flower-products')}>
+            Flower Products
+          </button>
+          <button className="nav-btn concentrates-btn" onClick={() => onNavigateTo('concentrates')}>
+            Vapes →
+          </button>
+        </div>
       </div>
 
       {/* Left Sidebar - Plant List */}
@@ -154,45 +165,28 @@ export default function Plants({ onNavigateTo }) {
             <h2>{expandedPlant.product_name || expandedPlant.genotype?.strain_name || 'Unknown Strain'}</h2>
             <p className="plant-id">{expandedPlant.uid}</p>
 
-            {/* Genotype Section */}
-            <div className="section">
-              <h3>Genotype</h3>
-              <div className="section-content">
-                {expandedPlant.strain_status && (
-                  <p><strong>Status:</strong> {expandedPlant.strain_status}</p>
-                )}
-                {expandedPlant.genotype?.breeder && (
-                  <p><strong>Breeder:</strong> {expandedPlant.genotype.breeder}</p>
-                )}
-                {expandedPlant.genotype?.lineage && expandedPlant.genotype.lineage.length > 0 && (
-                  <p><strong>Lineage:</strong> {expandedPlant.genotype.lineage.join(' × ')}</p>
-                )}
-                {expandedPlant.genotype?.ploidy && (
-                  <p><strong>Ploidy:</strong> {expandedPlant.genotype.ploidy}</p>
-                )}
-              </div>
-            </div>
-
-            {/* VIBE Cluster Section */}
+              {/* VIBE Cluster Section */}
             {expandedPlant.vibe_cluster && expandedPlant.vibe_cluster !== 'unclassified' && (
               <div className="section">
+                <h1>Genotype:</h1>
                 <h3>VIBE Cluster: {expandedPlant.vibe_cluster}</h3>
                 <div className="section-content">
                   {getClusterInfo(expandedPlant.vibe_cluster) && (
                     <>
-                      <p><strong>Primary Terpene Drivers:</strong></p>
-                      <p className="terpenes">
+                      <h3><strong>Primary Terpene Drivers:</strong></h3>
+                      <h4 className="terpenes">
                         {getClusterInfo(expandedPlant.vibe_cluster).primary_terpene_drivers.join(', ')}
-                      </p>
-                      <p><strong>Tasting Notes:</strong></p>
-                      <p className="tasting-notes">
+                      </h4>
+                      <h3><strong>Tasting Notes:</strong></h3>
+                      <h4 className="tasting-notes">
                         {getClusterInfo(expandedPlant.vibe_cluster).tasting_notes.join(', ')}
-                      </p>
+                      </h4>
                     </>
                   )}
                 </div>
               </div>
             )}
+          
 
             {/* Concentrates Section */}
             {plantConcentrates.length > 0 && (
@@ -261,9 +255,9 @@ export default function Plants({ onNavigateTo }) {
               <div className="section">
                 <h3>Tags</h3>
                 <div className="plant-tags">
-                  {expandedPlant.tags.map((tag, i) => (
+                  {/* {expandedPlant.tags.map((tag, i) => (
                     <span key={i} className="tag">{tag}</span>
-                  ))}
+                  ))} */}
                 </div>
               </div>
             )}
@@ -289,6 +283,7 @@ export default function Plants({ onNavigateTo }) {
             <h3>Summary</h3>
             <p><strong>UID:</strong> {expandedPlant.uid}</p>
             <p><strong>Status:</strong> {expandedPlant.strain_status || 'Unknown'}</p>
+            <p><strong>Strain Type:</strong> {expandedPlant.strain_type || 'N/A'}</p>
             <p><strong>Sex:</strong> {expandedPlant.genotype?.sex || 'Unknown'}</p>
             {expandedPlant.vibe_cluster !== 'unclassified' && (
               <p><strong>Cluster:</strong> {expandedPlant.vibe_cluster}</p>

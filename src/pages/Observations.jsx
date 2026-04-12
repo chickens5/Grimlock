@@ -155,7 +155,7 @@ export default function Observations({ onNavigateTo }) {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [editingObservationId, setEditingObservationId] = useState(null);
   const [formState, setFormState] = useState(EMPTY_OBSERVATION_FORM);
-  const [isManageHarvestOpen, setIsManageHarvestOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('observations'); // 'observations' or 'manage'
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
@@ -369,16 +369,23 @@ export default function Observations({ onNavigateTo }) {
 
   const handleGroupFormChange = (event) => {
     const { name, value } = event.target;
-    setGroupFormState(current => ({
-      ...current,
-      [name]: value
-    }));
-
-    if (name === 'har_grp') {
-      const matchedGroup = harvestGroups.find(group => group.har_grp === value);
-      if (matchedGroup) {
-        setSelectedHarvestGroupId(matchedGroup._id);
+    
+    if (name === 'group_id') {
+      // Handle group selection by ID
+      const group = harvestGroups.find(group => String(group._id) === String(value));
+      if (group) {
+        setSelectedHarvestGroupId(group._id);
+        setGroupFormState(mapHarvestGroupToForm(group));
+        setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
+        setNewHarvestGroupKey('');
       }
+    } else if (name === 'har_grp' && !selectedHarvestGroup) {
+      // Only allow har_grp changes when creating new group
+      setGroupFormState(current => ({
+        ...current,
+        [name]: value
+      }));
+      setNewHarvestGroupKey(value);
     }
   };
 
@@ -389,20 +396,40 @@ export default function Observations({ onNavigateTo }) {
     clearMessages();
 
     try {
-      const harGrpValue = (newHarvestGroupKey || groupFormState.har_grp || '').trim();
+      if (selectedHarvestGroup) {
+        // Update existing group - cannot modify har_grp
+        await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            current_room: groupFormState.current_room,
+            notes: groupFormState.notes
+          })
+        }, 'Failed to update harvest group');
 
-      const createdGroup = await requestJson('/api/harvest-groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...groupFormState,
-          har_grp: harGrpValue
-        })
-      }, 'Failed to create harvest group');
+        setNotice(`Harvest group ${selectedHarvestGroup.har_grp} updated.`);
+      } else {
+        // Create new group
+        const harGrpValue = (newHarvestGroupKey || groupFormState.har_grp || '').trim();
+        if (!harGrpValue) {
+          throw new Error('Provide a harvest group key.');
+        }
 
-      setNotice(`Harvest group ${createdGroup.har_grp} created.`);
-      await refreshCurrentData({ preferredGroupId: createdGroup._id });
-      setGroupFormState(mapHarvestGroupToForm(createdGroup));
+        const createdGroup = await requestJson('/api/harvest-groups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            har_grp: harGrpValue,
+            current_room: groupFormState.current_room,
+            notes: groupFormState.notes
+          })
+        }, 'Failed to create harvest group');
+
+        setNotice(`Harvest group ${createdGroup.har_grp} created.`);
+        await refreshCurrentData({ preferredGroupId: createdGroup._id });
+      }
+
+      setGroupFormState(mapHarvestGroupToForm(selectedHarvestGroup || null));
       setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
       setNewHarvestGroupKey('');
     } catch (err) {
@@ -413,28 +440,9 @@ export default function Observations({ onNavigateTo }) {
   };
 
   const handleUpdateHarvestGroup = async () => {
-    if (!selectedHarvestGroup) {
-      setError('Select a harvest group to update.');
-      return;
-    }
-
-    setGroupFormSubmitting(true);
-    clearMessages();
-
-    try {
-      await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(groupFormState)
-      }, 'Failed to update harvest group');
-
-      setNotice('Harvest group updated.');
-      await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id, preferredPlantId: selectedPlant?._id });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGroupFormSubmitting(false);
-    }
+    // This is now handled by handleCreateHarvestGroup
+    // Keeping this for backwards compatibility but redirecting to the combined handler
+    return handleCreateHarvestGroup({ preventDefault: () => {} });
   };
 
   const handleDeleteHarvestGroup = async () => {
@@ -469,16 +477,20 @@ export default function Observations({ onNavigateTo }) {
 
   const handleGroupPlantFormChange = (event) => {
     const { name, value } = event.target;
-    setGroupPlantFormState(current => ({
-      ...current,
-      [name]: name === 'plant_count' ? value : value
-    }));
-
-    if (name === 'strain_name') {
-      const matchedPlant = plants.find(plant => plant.strain_name === value);
-      if (matchedPlant) {
-        setSelectedPlantId(matchedPlant._id);
+    
+    if (name === 'plant_id') {
+      // Handle plant selection by ID
+      const plant = plants.find(plant => String(plant._id) === String(value));
+      if (plant) {
+        setSelectedPlantId(plant._id);
+        setGroupPlantFormState(mapHarvestPlantToForm(plant));
       }
+    } else {
+      // Handle form field changes
+      setGroupPlantFormState(current => ({
+        ...current,
+        [name]: name === 'plant_count' ? value : value
+      }));
     }
   };
 
@@ -493,26 +505,44 @@ export default function Observations({ onNavigateTo }) {
     clearMessages();
 
     try {
-      const strainNameValue = (newStrainName || groupPlantFormState.strain_name || '').trim();
-      if (!strainNameValue) {
-        throw new Error('Provide a new strain name or select one from the dropdown.');
+      if (selectedPlant) {
+        // Update existing plant
+        await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants/${selectedPlant._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            strain_name: groupPlantFormState.strain_name,
+            plant_count: toOptionalNumber(groupPlantFormState.plant_count) || 1,
+            current_room: groupPlantFormState.current_room,
+            notes: groupPlantFormState.notes
+          })
+        }, 'Failed to update harvest-group plant');
+
+        setNotice('Plant updated.');
+      } else {
+        // Create new plant
+        const strainNameValue = (newStrainName || groupPlantFormState.strain_name || '').trim();
+        if (!strainNameValue) {
+          throw new Error('Provide a new strain name or select one from the dropdown.');
+        }
+
+        await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            strain_name: strainNameValue,
+            plant_count: toOptionalNumber(groupPlantFormState.plant_count) || 1,
+            current_room: groupPlantFormState.current_room,
+            notes: groupPlantFormState.notes
+          })
+        }, 'Failed to add plant to harvest group');
+
+        setNotice('Plant added to harvest group.');
       }
 
-      const updatedGroup = await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...groupPlantFormState,
-          strain_name: strainNameValue,
-          plant_count: toOptionalNumber(groupPlantFormState.plant_count) || 1
-        })
-      }, 'Failed to add plant to harvest group');
-
-      const addedPlant = updatedGroup.plants?.[updatedGroup.plants.length - 1];
-      setNotice('Plant added to harvest group.');
       setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
       setNewStrainName('');
-      await refreshCurrentData({ preferredGroupId: updatedGroup._id, preferredPlantId: addedPlant?._id });
+      await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id, preferredPlantId: selectedPlant?._id });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -521,31 +551,9 @@ export default function Observations({ onNavigateTo }) {
   };
 
   const handleUpdateGroupPlant = async () => {
-    if (!selectedHarvestGroup || !selectedPlant) {
-      setError('Select a harvest-group plant to update.');
-      return;
-    }
-
-    setGroupPlantFormSubmitting(true);
-    clearMessages();
-
-    try {
-      const updatedGroup = await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants/${selectedPlant._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...groupPlantFormState,
-          plant_count: toOptionalNumber(groupPlantFormState.plant_count) || 1
-        })
-      }, 'Failed to update harvest-group plant');
-
-      setNotice('Harvest-group plant updated.');
-      await refreshCurrentData({ preferredGroupId: updatedGroup._id, preferredPlantId: selectedPlant._id });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGroupPlantFormSubmitting(false);
-    }
+    // This is now handled by handleCreateGroupPlant
+    // Keeping this for backwards compatibility but redirecting to the combined handler
+    return handleCreateGroupPlant({ preventDefault: () => {} });
   };
 
   const handleDeleteGroupPlant = async () => {
@@ -607,373 +615,540 @@ export default function Observations({ onNavigateTo }) {
           <>
           
              <div className="hg-highlight-card">
-              <h1>Total Harvest Groups in House: {harvestGroups.length}</h1>
-              <h1>Total Plants in {selectedHarvestGroup.har_grp}: {groupPlantTotalCount}</h1>
+              <h1>Current Harvest Group: {selectedHarvestGroup.har_grp}</h1>
+              <h1>Total Plants: {groupPlantTotalCount}</h1>
+              <h2>Current Room: {selectedHarvestGroup.current_room || 'Unassigned'}</h2>
+              <div className="selected-plant-meta observations-header-actions">
+                    <i><strong>Latest Record:</strong> {selectedHarvestGroup.latest_recorded_at ? formatDate(selectedHarvestGroup.latest_recorded_at) : 'No data'}</i>
+                    <i><strong>Total Observations:</strong> {selectedHarvestGroup.observations_count || 0}</i>
+                  </div>
                 </div>
               
-             <h1>Manage Harvest Groups here: </h1>
-             
-              <div className="selected-plant-meta observations-header-actions">
-                <div className="sidebar-section-header">
-         
-          
-        
-        <button
-          type="button"
-          className="primary-btn manage-hg-btn"
-          onClick={() => setIsManageHarvestOpen(true)}
-        >
-          Manage Harvest Groups
-        </button>
-       {harvestGroups.length === 0 ? (
-            <div className="observations-empty-state compact">No harvest groups found.</div>
-          ) : (
-            harvestGroups.map(group => (
-              <button
-                key={group._id}
-                type="button"
-                className={`harvest-group-item ${selectedHarvestGroupId === group._id ? 'active' : ''}`}
-                onClick={() => setSelectedHarvestGroupId(group._id)}
-              >
-                <span className="harvest-group-code">{group.har_grp}</span>
-                <span className="harvest-group-meta">
-                  Room: {group.current_room || 'Unassigned'}
-                </span>
-                <span className="harvest-group-meta">
-                  {group.plant_count || 0} strains • {group.plant_total_count || 0} plants • {group.observations_count || 0} observations
-                </span>
-              </button>
-            ))
-          )}
-        <p><strong>Latest Record:</strong> {selectedHarvestGroup.latest_recorded_at ? formatDate(selectedHarvestGroup.latest_recorded_at) : 'No data'}</p>
-                <p><strong>Total Observations:</strong> {selectedHarvestGroup.observations_count || 0}</p>
+             <div className="view-mode-tabs">
+               <button
+                 className={`tab-button ${viewMode === 'observations' ? 'active' : ''}`}
+                 onClick={() => setViewMode('observations')}
+               >
+                 Observations
+               </button>
+               <button
+                 className={`tab-button ${viewMode === 'manage' ? 'active' : ''}`}
+                 onClick={() => setViewMode('manage')}
+               >
+                 Manage Harvest & Plants
+               </button>
+             </div>
 
-                <div className="header-plant-buttons">
-                  {plants.length === 0 ? (
-                    <span className="harvest-group-meta">Add plants to this HG to begin observations.</span>
-                  ) : (
-                    plants.map(plant => (
-                      <button
-                        key={plant._id}
-                        type="button"
-                        className={`header-plant-button ${String(selectedPlantId) === String(plant._id) ? 'active' : ''}`}
-                        onClick={() => setSelectedPlantId(plant._id)}
-                      >
-                        {`${selectedHarvestGroup.har_grp}.${plant.strain_name}`}
-                      </button>
-                    ))
-                  )}
-                </div>
-                {selectedPlant && (
-                  <p><strong>Selected Plant:</strong> {selectedPlant.strain_name} ({selectedPlant.plant_count || 1})</p>
-                )}
-              </div>
-            </div>
-
-            {error && <div className="error">Error: {error}</div>}
+            {error && <div className="error">{error}</div>}
             {notice && <div className="notice">{notice}</div>}
 
-            {!selectedPlant ? (
-              <div className="observations-empty-state compact">Select a plant button in the header to manage observations.</div>
-            ) : (
+            {viewMode === 'observations' ? (
               <>
-              <div>
+                <div className="observations-view">
+                  <div className="selected-plant-selection">
+                    <label>
+                      Select Harvest Group:
+                      <select value={selectedHarvestGroupId || ''} onChange={(e) => setSelectedHarvestGroupId(e.target.value)}>
+                        <option value="">Choose a harvest group...</option>
+                        {harvestGroups.map(group => (
+                          <option key={group._id} value={group._id}>
+                            {group.har_grp} (Room: {group.current_room || 'Unassigned'} • {group.plant_total_count || 0} plants)
+                          </option>
+                        ))}
+                      </select>
+                    </label>
 
-                <h1>Management stuff goes here</h1>
-              </div>
-                <section className="editor-card inventory-editor">
-                  <div className="editor-card-header">
-                    <div>
-                      <h3>{editingObservationId ? 'Edit Observation' : 'New Observation'}</h3>
-                      <p>
-                        Plant {selectedPlant.strain_name} in {selectedHarvestGroup.har_grp}
-                      </p>
-                    </div>
-                    <div className="form-actions">
-                      {editingObservationId && (
-                        <button type="button" className="ghost-btn" onClick={resetForm}>
-                          Cancel Edit
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <form className="data-form" onSubmit={handleSubmit}>
-                    <div className="form-grid form-grid-wide">
+                    {plants.length > 0 && (
                       <label>
-                        Recorded At
-                        <input
-                          type="datetime-local"
-                          name="recorded_at"
-                          value={formState.recorded_at}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Growth Stage
-                        <select name="growth_stage" value={formState.growth_stage} onChange={handleFormChange}>
-                          {Object.entries(STAGE_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
+                        Select Plant/Strain:
+                        <select value={selectedPlantId || ''} onChange={(e) => setSelectedPlantId(e.target.value)}>
+                          <option value="">Choose a plant...</option>
+                          {plants.map(plant => (
+                            <option key={plant._id} value={plant._id}>
+                              {plant.strain_name} ({plant.plant_count || 1} plants)
+                            </option>
                           ))}
                         </select>
                       </label>
-
-                      <label>
-                        Data Quality (0-10)
-                        <input
-                          type="number"
-                          name="data_quality"
-                          min="0"
-                          max="10"
-                          step="0.1"
-                          value={formState.data_quality}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Node Count
-                        <input
-                          type="number"
-                          name="node_count"
-                          min="0"
-                          value={formState.node_count}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Height (cm)
-                        <input
-                          type="number"
-                          name="height_cm"
-                          step="0.1"
-                          value={formState.height_cm}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Canopy Width (cm)
-                        <input
-                          type="number"
-                          name="canopy_width_cm"
-                          step="0.1"
-                          value={formState.canopy_width_cm}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Leaf Count
-                        <input
-                          type="number"
-                          name="leaf_count"
-                          min="0"
-                          value={formState.leaf_count}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Health Score (0-10)
-                        <input
-                          type="number"
-                          name="overall_score"
-                          min="0"
-                          max="10"
-                          step="0.1"
-                          value={formState.overall_score}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Temp (C)
-                        <input
-                          type="number"
-                          name="temp_c"
-                          step="0.1"
-                          value={formState.temp_c}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Humidity (%)
-                        <input
-                          type="number"
-                          name="humidity_pct"
-                          step="0.1"
-                          value={formState.humidity_pct}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        VPD (kPa)
-                        <input
-                          type="number"
-                          name="vpd_kpa"
-                          step="0.01"
-                          value={formState.vpd_kpa}
-                          onChange={handleFormChange}
-                        />
-                      </label>
-
-                      <label>
-                        Recorded By
-                        <input
-                          type="text"
-                          name="recorded_by"
-                          value={formState.recorded_by}
-                          onChange={handleFormChange}
-                          placeholder="Operator name"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="form-actions">
-                      <button className="primary-btn" type="submit" disabled={formSubmitting}>
-                        {formSubmitting ? 'Saving...' : editingObservationId ? 'Update Observation' : 'Create Observation'}
-                      </button>
-                      <button className="ghost-btn" type="button" onClick={resetForm} disabled={formSubmitting}>
-                        Clear
-                      </button>
-                    </div>
-                  </form>
-                </section>
-
-                {observationsLoading ? (
-                  <div className="observations-empty-state compact">Loading observations...</div>
-                ) : observations.length === 0 ? (
-                  <div className="observations-empty-state compact">
-                    No observations recorded for this plant yet.
+                    )}
                   </div>
-                ) : (
-                  <div className="observations-timeline">
-                    {observations.map(observation => (
-                      <article key={observation._id} className="observation-card">
-                        <div className="observation-card-header">
-                          <div>
-                            <h3>{formatStage(observation.growth_stage)}</h3>
-                            <p className="observation-date">{formatDate(observation.recorded_at)}</p>
-                            {observation.har_grp && (
-                              <p className="observation-date">Group: {observation.har_grp}</p>
-                            )}
+
+                  {!selectedPlant ? (
+                    <div className="observations-empty-state compact">Select a plant from the dropdown to manage observations.</div>
+                  ) : (
+                    <>
+                    <div>
+                    
+                    </div>
+                      <section className="editor-card inventory-editor">
+                        <div className="editor-card-header">
+                          <div className ='section'>
+                            <h2>{editingObservationId ? 'Edit Observation' : 'Create Observation for:'}</h2>
+                            <h3>
+                               {selectedPlant.strain_name} ({selectedHarvestGroup.har_grp})  {/* displays the currently selected plant and harvest group in the form header for context */}
+                            </h3>
                           </div>
-                          <div className="observation-card-actions">
-                            {typeof observation.data_quality === 'number' && (
-                              <span className="quality-badge">Quality {observation.data_quality}/10</span>
+                          <div className="form-actions">
+                            {editingObservationId && (
+                              <button type="button" className="ghost-btn" onClick={resetForm}>
+                                Cancel Edit
+                              </button>
                             )}
-                            <button type="button" className="ghost-btn small" onClick={() => handleEditObservation(observation)}>
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="danger-btn small"
-                              onClick={() => handleDeleteObservation(observation._id)}
-                              disabled={formSubmitting}
-                            >
-                              Delete
-                            </button>
                           </div>
                         </div>
 
-                        {(observation.morphology?.height_cm || observation.morphology?.canopy_width_cm || observation.morphology?.leaf_count || observation.morphology?.node_count || observation.morphology?.cola_count) && (
-                          <section className="observation-section">
-                            <h4>Morphology</h4>
-                            <div className="observation-grid">
-                              {typeof observation.morphology?.height_cm === 'number' && <p><strong>Height:</strong> {observation.morphology.height_cm} cm</p>}
-                              {typeof observation.morphology?.canopy_width_cm === 'number' && <p><strong>Canopy Width:</strong> {observation.morphology.canopy_width_cm} cm</p>}
-                              {typeof observation.morphology?.leaf_count === 'number' && <p><strong>Leaf Count:</strong> {observation.morphology.leaf_count}</p>}
-                              {typeof (observation.morphology?.node_count ?? observation.morphology?.cola_count) === 'number' && (
-                                <p><strong>Node Count:</strong> {observation.morphology.node_count ?? observation.morphology.cola_count}</p>
-                              )}
-                            </div>
-                          </section>
-                        )}
-                        {(typeof observation.health?.overall_score === 'number' || observation.health?.stress_type?.length > 0 || observation.health?.symptoms?.length > 0) && (
-                          <section className="observation-section">
-                            <h4>Health</h4>
-                            {typeof observation.health?.overall_score === 'number' && (
-                              <p><strong>Overall Score:</strong> {observation.health.overall_score}/10</p>
-                            )}
-                            {observation.health?.stress_type?.length > 0 && (
-                              <p><strong>Stress Types:</strong> {observation.health.stress_type.join(', ')}</p>
-                            )}
-                            {observation.health?.symptoms?.length > 0 && (
-                              <div className="list-block">
-                                <strong>Symptoms:</strong>
-                                {observation.health.symptoms.map((symptom, index) => (
-                                  <p key={`${observation._id}-symptom-${index}`}>
-                                    {symptom.type} at {symptom.location || 'unknown location'}
-                                    {typeof symptom.severity === 'number' ? `, severity ${symptom.severity}/10` : ''}
-                                    {symptom.confirmed_by ? `, confirmed by ${symptom.confirmed_by}` : ''}
-                                  </p>
+                        <form className="data-form" onSubmit={handleSubmit}>
+                          <div className="form-grid form-grid-wide">
+                            <label>
+                              Recorded At
+                              <input
+                                type="datetime-local"
+                                name="recorded_at"
+                                value={formState.recorded_at}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              Growth Stage
+                              <select name="growth_stage" value={formState.growth_stage} onChange={handleFormChange}>
+                                {Object.entries(STAGE_LABELS).map(([value, label]) => (
+                                  <option key={value} value={value}>{label}</option>
                                 ))}
-                              </div>
-                            )}
-                          </section>
-                        )}
+                              </select>
+                            </label>
 
-                        {(typeof observation.environment_snapshot?.temp_c === 'number' || typeof observation.environment_snapshot?.humidity_pct === 'number' || typeof observation.environment_snapshot?.vpd_kpa === 'number' || typeof observation.environment_snapshot?.ppfd_umol === 'number') && (
-                          <section className="observation-section">
-                            <h4>Environment Snapshot</h4>
-                            <div className="observation-grid">
-                              {typeof observation.environment_snapshot?.temp_c === 'number' && <p><strong>Temp:</strong> {observation.environment_snapshot.temp_c} C</p>}
-                              {typeof observation.environment_snapshot?.humidity_pct === 'number' && <p><strong>Humidity:</strong> {observation.environment_snapshot.humidity_pct}%</p>}
-                              {typeof observation.environment_snapshot?.vpd_kpa === 'number' && <p><strong>VPD:</strong> {observation.environment_snapshot.vpd_kpa} kPa</p>}
-                              {typeof observation.environment_snapshot?.ppfd_umol === 'number' && <p><strong>PPFD:</strong> {observation.environment_snapshot.ppfd_umol} umol</p>}
-                              {typeof observation.environment_snapshot?.co2_ppm === 'number' && <p><strong>CO2:</strong> {observation.environment_snapshot.co2_ppm} ppm</p>}
-                              {typeof observation.environment_snapshot?.photoperiod_hrs === 'number' && <p><strong>Photoperiod:</strong> {observation.environment_snapshot.photoperiod_hrs} hrs</p>}
-                            </div>
-                          </section>
-                        )}
+                            <label>
+                              Data Quality (0-10)
+                              <input
+                                type="number"
+                                name="data_quality"
+                                min="0"
+                                max="10"
+                                step="0.1"
+                                value={formState.data_quality}
+                                onChange={handleFormChange}
+                              />
+                            </label>
 
-                        {observation.media?.length > 0 && (
-                          <section className="observation-section">
-                            <h4>Media</h4>
-                            <div className="observation-media-grid">
-                              {observation.media.map((item, index) => (
-                                <div key={`${observation._id}-media-${index}`} className="observation-media-item">
-                                  <p className="observation-media-label">
-                                    <strong>{item.type || 'Media'}</strong>
-                                    {item.angle ? ` (${item.angle})` : ''}
-                                  </p>
-                                  {isImageMedia(item) ? (
-                                    <a href={item.url} target="_blank" rel="noopener noreferrer">
-                                      <img
-                                        className="observation-media-image"
-                                        src={item.url}
-                                        alt={`${item.type || 'Media'} ${item.angle || ''}`.trim()}
-                                        loading="lazy"
-                                      />
-                                    </a>
-                                  ) : (
-                                    <a
-                                      className="observation-media-link"
-                                      href={item.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      {item.url}
-                                    </a>
+                            <label>
+                              Node Count
+                              <input
+                                type="number"
+                                name="node_count"
+                                min="0"
+                                value={formState.node_count}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              Height (cm)
+                              <input
+                                type="number"
+                                name="height_cm"
+                                step="0.1"
+                                value={formState.height_cm}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              Canopy Width (cm)
+                              <input
+                                type="number"
+                                name="canopy_width_cm"
+                                step="0.1"
+                                value={formState.canopy_width_cm}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              Leaf Count
+                              <input
+                                type="number"
+                                name="leaf_count"
+                                min="0"
+                                value={formState.leaf_count}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              Health Score (0-10)
+                              <input
+                                type="number"
+                                name="overall_score"
+                                min="0"
+                                max="10"
+                                step="0.1"
+                                value={formState.overall_score}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              Temp (C)
+                              <input
+                                type="number"
+                                name="temp_c"
+                                step="0.1"
+                                value={formState.temp_c}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              Humidity (%)
+                              <input
+                                type="number"
+                                name="humidity_pct"
+                                step="0.1"
+                                value={formState.humidity_pct}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              VPD (kPa)
+                              <input
+                                type="number"
+                                name="vpd_kpa"
+                                step="0.01"
+                                value={formState.vpd_kpa}
+                                onChange={handleFormChange}
+                              />
+                            </label>
+
+                            <label>
+                              Recorded By
+                              <input
+                                type="text"
+                                name="recorded_by"
+                                value={formState.recorded_by}
+                                onChange={handleFormChange}
+                                placeholder="Operator name"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="form-actions">
+                            <button className="primary-btn" type="submit" disabled={formSubmitting}>
+                              {formSubmitting ? 'Saving...' : editingObservationId ? 'Update Observation' : 'Create Observation'}
+                            </button>
+                            <button className="ghost-btn" type="button" onClick={resetForm} disabled={formSubmitting}>
+                              Clear
+                            </button>
+                          </div>
+                        </form>
+                      </section>
+
+                      {observationsLoading ? (
+                        <div className="observations-empty-state compact">Loading observations...</div>
+                      ) : observations.length === 0 ? (
+                        <div className="observations-empty-state compact">
+                          No observations recorded for this plant yet.
+                        </div>
+                      ) : (
+                        <div className="observations-timeline">
+                          {observations.map(observation => (
+                            <article key={observation._id} className="observation-card">
+                              <div className="observation-card-header">
+                                <div>
+                                  <h2>Plant: {observation.plant_name}</h2>
+                                  <h3>Growth Stage: {formatStage(observation.growth_stage)}</h3>
+                                  
+                                  <p className="observation-date">Observed: {formatDate(observation.recorded_at)}</p>
+                                  {observation.har_grp && (
+                                    <p className="observation-date">Group: {observation.har_grp}</p>
                                   )}
+                                  
                                 </div>
-                              ))}
-                            </div>
-                          </section>
-                        )}
+                                <div className="observation-card-actions">
+                                  {typeof observation.data_quality === 'number' && (
+                                    <span className="quality-badge">Data Quality Score: {observation.data_quality}/10</span>
+                                  )}
+                                  <button type="button" className="ghost-btn small" onClick={() => handleEditObservation(observation)}>
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="danger-btn small"
+                                    onClick={() => handleDeleteObservation(observation._id)}
+                                    disabled={formSubmitting}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
 
-                        <p className="observation-footer">
-                          Recorded by {observation.recorded_by || 'unknown'}
-                        </p>
-                      </article>
-                    ))}
-                  </div>
-                )}
+                              {(observation.morphology?.height_cm || observation.morphology?.canopy_width_cm || observation.morphology?.leaf_count || observation.morphology?.node_count || observation.morphology?.cola_count) && (
+                                <section className="observation-section">
+                                  <h4>Morphology</h4>
+                                  <div className="observation-grid">
+                                    {typeof observation.morphology?.height_cm === 'number' && <p><strong>Height:</strong> {observation.morphology.height_cm} cm</p>}
+                                    {typeof observation.morphology?.canopy_width_cm === 'number' && <p><strong>Canopy Width:</strong> {observation.morphology.canopy_width_cm} cm</p>}
+                                    {typeof observation.morphology?.leaf_count === 'number' && <p><strong>Leaf Count:</strong> {observation.morphology.leaf_count}</p>}
+                                    {typeof (observation.morphology?.node_count ?? observation.morphology?.cola_count) === 'number' && (
+                                      <p><strong>Node Count:</strong> {observation.morphology.node_count ?? observation.morphology.cola_count}</p>
+                                    )}
+                                  </div>
+                                </section>
+                              )}
+                              {(typeof observation.health?.overall_score === 'number' || observation.health?.stress_type?.length > 0 || observation.health?.symptoms?.length > 0) && (
+                                <section className="observation-section">
+                                  <h4>Health</h4>
+                                  {typeof observation.health?.overall_score === 'number' && (
+                                    <p><strong>Overall Score:</strong> {observation.health.overall_score}/10</p>
+                                  )}
+                                  {observation.health?.stress_type?.length > 0 && (
+                                    <p><strong>Stress Types:</strong> {observation.health.stress_type.join(', ')}</p>
+                                  )}
+                                  {observation.health?.symptoms?.length > 0 && (
+                                    <div className="list-block">
+                                      <strong>Symptoms:</strong>
+                                      {observation.health.symptoms.map((symptom, index) => (
+                                        <p key={`${observation._id}-symptom-${index}`}>
+                                          {symptom.type} at {symptom.location || 'unknown location'}
+                                          {typeof symptom.severity === 'number' ? `, severity ${symptom.severity}/10` : ''}
+                                          {symptom.confirmed_by ? `, confirmed by ${symptom.confirmed_by}` : ''}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </section>
+                              )}
+
+                              {(typeof observation.environment_snapshot?.temp_c === 'number' || typeof observation.environment_snapshot?.humidity_pct === 'number' || typeof observation.environment_snapshot?.vpd_kpa === 'number' || typeof observation.environment_snapshot?.ppfd_umol === 'number') && (
+                                <section className="observation-section">
+                                  <h4>Environment Snapshot</h4>
+                                  <div className="observation-grid">
+                                    {typeof observation.environment_snapshot?.temp_c === 'number' && <p><strong>Temp:</strong> {observation.environment_snapshot.temp_c} C</p>}
+                                    {typeof observation.environment_snapshot?.humidity_pct === 'number' && <p><strong>Humidity:</strong> {observation.environment_snapshot.humidity_pct}%</p>}
+                                    {typeof observation.environment_snapshot?.vpd_kpa === 'number' && <p><strong>VPD:</strong> {observation.environment_snapshot.vpd_kpa} kPa</p>}
+                                    {typeof observation.environment_snapshot?.ppfd_umol === 'number' && <p><strong>PPFD:</strong> {observation.environment_snapshot.ppfd_umol} umol</p>}
+                                    {typeof observation.environment_snapshot?.co2_ppm === 'number' && <p><strong>CO2:</strong> {observation.environment_snapshot.co2_ppm} ppm</p>}
+                                    {typeof observation.environment_snapshot?.photoperiod_hrs === 'number' && <p><strong>Photoperiod:</strong> {observation.environment_snapshot.photoperiod_hrs} hrs</p>}
+                                  </div>
+                                </section>
+                              )}
+
+                              {observation.media?.length > 0 && (
+                                <section className="observation-section">
+                                  <h4>Media</h4>
+                                  <div className="observation-media-grid">
+                                    {observation.media.map((item, index) => (
+                                      <div key={`${observation._id}-media-${index}`} className="observation-media-item">
+                                        <p className="observation-media-label">
+                                          <strong>{item.type || 'Media'}</strong>
+                                          {item.angle ? ` (${item.angle})` : ''}
+                                        </p>
+                                        {isImageMedia(item) ? (
+                                          <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                            <img
+                                              className="observation-media-image"
+                                              src={item.url}
+                                              alt={`${item.type || 'Media'} ${item.angle || ''}`.trim()}
+                                              loading="lazy"
+                                            />
+                                          </a>
+                                        ) : (
+                                          <a
+                                            className="observation-media-link"
+                                            href={item.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            {item.url}
+                                          </a>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </section>
+                              )}
+
+                              <p className="observation-footer">
+                                Recorded by {observation.recorded_by || 'unknown'}
+                              </p>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="manage-view">
+                  <section className="editor-card manage-card">
+                    <div className="sidebar-section-header">
+                      <h3>Harvest Group Management</h3>
+                    </div>
+
+                    <form className="data-form" onSubmit={handleCreateHarvestGroup}>
+                      <div className="form-grid">
+                        <label>
+                          Select Group (to edit or delete)
+                          <select
+                            name="group_id"
+                            value={selectedHarvestGroupId || ''}
+                            onChange={handleGroupFormChange}
+                          >
+                            <option value="">Create New</option>
+                            {harvestGroups.map(group => (
+                              <option key={group._id} value={group._id}>
+                                {group.har_grp} (Room: {group.current_room || 'N/A'})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {!selectedHarvestGroup && (
+                          <label>
+                            HG Key (for new group)
+                            <input
+                              type="text"
+                              name="har_grp"
+                              value={groupFormState.har_grp}
+                              onChange={handleGroupFormChange}
+                              placeholder="HG-APR-2026-A"
+                            />
+                          </label>
+                        )}
+                        <label>
+                          Current Room
+                          <input
+                            type="text"
+                            name="current_room"
+                            value={groupFormState.current_room}
+                            onChange={(e) => setGroupFormState(current => ({ ...current, current_room: e.target.value }))}
+                            placeholder="Flower Room A"
+                          />
+                        </label>
+                        <label className="form-span-full">
+                          Notes
+                          <textarea
+                            rows="2"
+                            name="notes"
+                            value={groupFormState.notes}
+                            onChange={(e) => setGroupFormState(current => ({ ...current, notes: e.target.value }))}
+                          />
+                        </label>
+                      </div>
+                      <div className="form-actions">
+                        <button className="primary-btn" type="submit" disabled={groupFormSubmitting}>
+                          {selectedHarvestGroup ? 'Update Group' : 'Create Group'}
+                        </button>
+                        <button
+                          className="danger-btn"
+                          type="button"
+                          onClick={handleDeleteHarvestGroup}
+                          disabled={groupFormSubmitting || !selectedHarvestGroup}
+                        >
+                          Delete Selected
+                        </button>
+                      </div>
+                    </form>
+                  </section>
+
+                  <section className="editor-card manage-card">
+                    <div className="sidebar-section-header">
+                      <h3>Plants In Group</h3>
+                      <span>{plants.length}</span>
+                    </div>
+
+                    {selectedHarvestGroup ? (
+                      <form className="data-form" onSubmit={handleCreateGroupPlant}>
+                        <div className="form-grid">
+                          <label>
+                            Select Plant (to edit or delete)
+                            <select
+                              name="plant_id"
+                              value={selectedPlantId || ''}
+                              onChange={handleGroupPlantFormChange}
+                            >
+                              <option value="">Add New</option>
+                              {plants.map(plant => (
+                                <option key={plant._id} value={plant._id}>
+                                  {plant.strain_name} ({plant.plant_count} plants)
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {!selectedPlant && (
+                            <label>
+                              Strain Name (for new plant)
+                              <input
+                                type="text"
+                                name="new_strain_name"
+                                value={newStrainName}
+                                onChange={event => setNewStrainName(event.target.value)}
+                                placeholder="Pimp Juice"
+                              />
+                            </label>
+                          )}
+                          {selectedPlant && (
+                            <label>
+                              Strain Name
+                              <input
+                                type="text"
+                                name="strain_name"
+                                value={groupPlantFormState.strain_name}
+                                onChange={handleGroupPlantFormChange}
+                                placeholder="Strain name"
+                              />
+                            </label>
+                          )}
+                          <label>
+                            Plant Count
+                            <input
+                              type="number"
+                              min="1"
+                              name="plant_count"
+                              value={groupPlantFormState.plant_count}
+                              onChange={handleGroupPlantFormChange}
+                            />
+                          </label>
+                          <label>
+                            Current Room
+                            <input
+                              type="text"
+                              name="current_room"
+                              value={groupPlantFormState.current_room}
+                              onChange={handleGroupPlantFormChange}
+                            />
+                          </label>
+                          <label className="form-span-full">
+                            Notes
+                            <textarea
+                              rows="2"
+                              name="notes"
+                              value={groupPlantFormState.notes}
+                              onChange={handleGroupPlantFormChange}
+                            />
+                          </label>
+                        </div>
+                        <div className="form-actions">
+                          <button className="primary-btn" type="submit" disabled={groupPlantFormSubmitting}>
+                            {selectedPlant ? 'Update Plant' : 'Add Plant'}
+                          </button>
+                          <button
+                            className="danger-btn"
+                            type="button"
+                            onClick={handleDeleteGroupPlant}
+                            disabled={groupPlantFormSubmitting || !selectedPlant}
+                          >
+                            Delete Selected Plant
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="observations-empty-state compact">Select a harvest group first.</div>
+                    )}
+                  </section>
+                </div>
               </>
             )}
           </>
@@ -999,188 +1174,6 @@ export default function Observations({ onNavigateTo }) {
           <div className="observations-empty-state compact">Select a harvest group to see summary.</div>
         )}
       </div>
-
-      {isManageHarvestOpen && (
-        <div className="hg-modal-backdrop" onClick={() => setIsManageHarvestOpen(false)}>
-          <div className="hg-modal" onClick={event => event.stopPropagation()}>
-            <div className="hg-modal-header">
-              <h3>Manage Harvest Groups</h3>
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setIsManageHarvestOpen(false)}
-                aria-label="Close harvest group management"
-              >
-                X
-              </button>
-            </div>
-
-            <div className="hg-modal-body">
-              <section className="editor-card harvest-groups-card">
-                <div className="sidebar-section-header">
-                  <h3>Harvest Group CRUD</h3>
-                </div>
-
-                <form className="data-form" onSubmit={handleCreateHarvestGroup}>
-                  <div className="form-grid">
-                    <label>
-                      HG Key
-                      <select
-                        name="har_grp"
-                        value={groupFormState.har_grp}
-                        onChange={handleGroupFormChange}
-                      >
-                        <option value="">Select Harvest Group</option>
-                        {harvestGroups.map(group => (
-                          <option key={group._id} value={group.har_grp}>
-                            {group.har_grp}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      New HG Key (Create)
-                      <input
-                        type="text"
-                        name="new_har_grp"
-                        value={newHarvestGroupKey}
-                        onChange={event => setNewHarvestGroupKey(event.target.value)}
-                        placeholder="HG-APR-2026-A"
-                      />
-                    </label>
-                    <label>
-                      Current Room
-                      <input
-                        type="text"
-                        name="current_room"
-                        value={groupFormState.current_room}
-                        onChange={handleGroupFormChange}
-                        placeholder="Flower Room A"
-                      />
-                    </label>
-                    <label className="form-span-full">
-                      Notes
-                      <textarea
-                        rows="2"
-                        name="notes"
-                        value={groupFormState.notes}
-                        onChange={handleGroupFormChange}
-                      />
-                    </label>
-                  </div>
-                  <div className="form-actions">
-                    <button className="primary-btn" type="submit" disabled={groupFormSubmitting}>
-                      Create HG
-                    </button>
-                    <button
-                      className="ghost-btn"
-                      type="button"
-                      onClick={handleUpdateHarvestGroup}
-                      disabled={groupFormSubmitting || !selectedHarvestGroup}
-                    >
-                      Update Selected HG
-                    </button>
-                    <button
-                      className="danger-btn"
-                      type="button"
-                      onClick={handleDeleteHarvestGroup}
-                      disabled={groupFormSubmitting || !selectedHarvestGroup}
-                    >
-                      Delete Selected HG
-                    </button>
-                  </div>
-                </form>
-              </section>
-
-              <section className="editor-card harvest-groups-card">
-                <div className="sidebar-section-header">
-                  <h3>Plants In Group</h3>
-                  <span>{plants.length}</span>
-                </div>
-
-                <form className="data-form" onSubmit={handleCreateGroupPlant}>
-                  <div className="form-grid">
-                    <label>
-                      Strain Name
-                      <select
-                        name="strain_name"
-                        value={groupPlantFormState.strain_name}
-                        onChange={handleGroupPlantFormChange}
-                      >
-                        <option value="">Select Existing Strain</option>
-                        {plants.map(plant => (
-                          <option key={plant._id} value={plant.strain_name}>
-                            {plant.strain_name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      New Strain Name (Add)
-                      <input
-                        type="text"
-                        name="new_strain_name"
-                        value={newStrainName}
-                        onChange={event => setNewStrainName(event.target.value)}
-                        placeholder="Pimp Juice"
-                      />
-                    </label>
-                    <label>
-                      Plant Count
-                      <input
-                        type="number"
-                        min="1"
-                        name="plant_count"
-                        value={groupPlantFormState.plant_count}
-                        onChange={handleGroupPlantFormChange}
-                      />
-                    </label>
-                    <label>
-                      Current Room
-                      <input
-                        type="text"
-                        name="current_room"
-                        value={groupPlantFormState.current_room}
-                        onChange={handleGroupPlantFormChange}
-                      />
-                    </label>
-                    <label className="form-span-full">
-                      Notes
-                      <textarea
-                        rows="2"
-                        name="notes"
-                        value={groupPlantFormState.notes}
-                        onChange={handleGroupPlantFormChange}
-                      />
-                    </label>
-                  </div>
-                  <div className="form-actions">
-                    <button className="primary-btn" type="submit" disabled={groupPlantFormSubmitting || !selectedHarvestGroup}>
-                      Add Plant
-                    </button>
-                    <button
-                      className="ghost-btn"
-                      type="button"
-                      onClick={handleUpdateGroupPlant}
-                      disabled={groupPlantFormSubmitting || !selectedPlant}
-                    >
-                      Update Selected Plant
-                    </button>
-                    <button
-                      className="danger-btn"
-                      type="button"
-                      onClick={handleDeleteGroupPlant}
-                      disabled={groupPlantFormSubmitting || !selectedPlant}
-                    >
-                      Delete Selected Plant
-                    </button>
-                  </div>
-                </form>
-              </section>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
