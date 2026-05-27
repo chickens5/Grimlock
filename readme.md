@@ -11,9 +11,6 @@ Grimlock is designed for plant breeders and researchers to:
 - Store lab analysis results (cannabinoids, terpenes, etc.)
 - Prepare datasets for ML models to detect stress, disease, and optimize breeding
 
-**Current Status**: Frontend homepage with aurora animation + Plant research database UI  
-**Next Phase**: Data input forms, observation recording, lab result integration
-
 ## Tech Stack
 
 - **Frontend**: React 18 + Vite + OGL (WebGL)
@@ -66,5 +63,3 @@ Grimlock/
 ### Prerequisites
 - Node.js 16+
 - MongoDB 6+ locally **or** a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster
-- mongodump / mongorestore (included with [MongoDB Database Tools](https://www.mongodb.com/try/download/database-tools)) — only needed for data migration
-
