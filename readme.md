@@ -1,5 +1,5 @@
 # Grimlock - Plant Research & JSX Art
-
+<img width="1918" height="910" alt="Screenshot 2026-05-27 092155" src="https://github.com/user-attachments/assets/3c303d1b-4276-42d6-84e4-c60ff1f3c905" />
 A full-stack web application for plant research with genotype/phenotype tracking and ML-ready data architecture.
 
 
@@ -17,6 +17,10 @@ Grimlock is designed for plant breeders and researchers to:
 - **Backend**: Express.js + Node.js
 - **Database**: MongoDB
 - **Styling**: CSS3 + WebGL shaders
+<img width="1909" height="907" alt="Screenshot 2026-05-27 092252" src="https://github.com/user-attachments/assets/85961110-f1da-4d25-a99c-c9274371b305" />
+
+##This project was made when I was working fulltime at a cannabis cultivation facility while pursuing my degree full time
+<img width="1918" height="909" alt="Screenshot 2026-05-27 092043" src="https://github.com/user-attachments/assets/6c5cd843-9f22-40f1-8aa3-d793f93ebfe2" />
 
 ## Project Structure
 
