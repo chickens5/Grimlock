@@ -2,10 +2,15 @@ import mongoose from 'mongoose';
 
 const harvestGroupPlantSchema = new mongoose.Schema(
   {
+    cultivar_name: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     strain_name: {
       type: String,
-      required: true,
-      trim: true
+      trim: true,
+      default: ''
     },
     plant_count: {
       type: Number,
@@ -41,6 +46,11 @@ const harvestGroupSchema = new mongoose.Schema(
       default: ''
     },
     notes: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    image_url: {
       type: String,
       trim: true,
       default: ''

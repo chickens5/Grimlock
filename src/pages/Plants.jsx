@@ -1,301 +1,112 @@
-import React, { useState, useEffect } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import rawPlants from '../../plant_data_with_pollinators.json';
+import { normalizePlants } from '../utils/normalizePlants';
+import { filterPlants } from '../utils/filterPlants';
+import FilterPanel from './eden-tool/FilterPanel';
+import PlantCard from './eden-tool/PlantCard';
+import PlantModal from './eden-tool/PlantModal';
+
 import './Plants.css';
-import { apiUrl } from '../lib/api';
+import './PlantsBG.css';
 
-const STRAIN_STATUS_FILTERS = ['all', 'R&D', 'House', 'Premier', 'Retired', 'Unknown'];
+const ALL_PLANTS = normalizePlants(rawPlants);
 
-export default function Plants({ onNavigateTo }) {
-  const [plants, setPlants] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [expandedPlantId, setExpandedPlantId] = useState(null);
-  const [concentrates, setConcentrates] = useState([]);
-  const [vibeClusterData, setVibeClusterData] = useState({});
-  const [selectedStrainStatus, setSelectedStrainStatus] = useState('all');
+const DEFAULT_FILTERS = {
+  search: '',
+  plantTypes: [],
+  sunExposure: [],
+  soilTypes: [],
+  bloomSeasons: [],
+  pollinators: [],
+  habitats: [],
+};
 
-  useEffect(() => {
-    fetchPlants();
-    fetchConcentrates();
-    fetchVibeClusterData();
-  }, [selectedStrainStatus]);
+function Plants() {
+ 
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [selectedPlant, setSelectedPlant] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const fetchPlants = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (selectedStrainStatus !== 'all') {
-        params.set('strain_status', selectedStrainStatus);
-      }
+  const handleFilterChange = useCallback((key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
 
-      const query = params.toString();
-      const response = await fetch(apiUrl(`/api/plants${query ? `?${query}` : ''}`));
-      if (!response.ok) throw new Error('Failed to fetch plants');
-      const data = await response.json();
-      setPlants(data);
-      setExpandedPlantId(current => (data.some(plant => plant._id === current) ? current : null));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filtered = useMemo(
+    () => filterPlants(ALL_PLANTS, filters),
+    [filters]
+  );
 
-  const fetchConcentrates = async () => {
-    try {
-      const response = await fetch(apiUrl('/api/concentrates'));
-      if (response.ok) {
-        const data = await response.json();
-        setConcentrates(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch concentrates:', err);
-    }
-  };
-
-  const fetchVibeClusterData = async () => {
-    try {
-      const response = await fetch(apiUrl('/api/concentrates/vibe-clusters'));
-      if (response.ok) {
-        const data = await response.json();
-        setVibeClusterData(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch VIBE cluster data:', err);
-    }
-  };
-
-  const expandedPlant = expandedPlantId 
-    ? plants.find(p => p._id === expandedPlantId) 
-    : null;
-
-  const plantConcentrates = expandedPlant
-    ? concentrates.filter(c => expandedPlant.concentrates?.includes(c._id))
-    : [];
-
-  const getClusterInfo = (cluster) => {
-    return vibeClusterData[cluster] || null;
-  };
-
-  const formatList = (value) => {
-    if (!value) return 'N/A';
-    if (Array.isArray(value)) return value.filter(Boolean).join(', ') || 'N/A';
-    return String(value).trim() || 'N/A';
-  };
-
-  if (loading) return <div className="plants-container"><p>Loading plants...</p></div>;
-  if (error) return <div className="plants-container"><p className="error">Error: {error}</p></div>;
 
   return (
-    <div className="plants-layout">
-      {/* Navigation Bar */}
-      <div className="plants-nav-bar">
-        <button className="nav-btn home-btn" onClick={() => onNavigateTo('home')}>
-          ← Home
+    <div className="plants-page app-layout">
+      <header className="app-header">
+        <div className="header-inner">
+          <div className="header-brand">
+        
+             <button className="nav-btn" onClick={() => {window.location.href = '/observations';}}>
+          Eden Plant Tool
         </button>
-        <div className="nav-title">Our Cultivars</div>
-        <div className="plants-nav-actions">
-          <button className="nav-btn" onClick={() => onNavigateTo('flower-products')}>
-            Flower Products
-          </button>
-          <button className="nav-btn concentrates-btn" onClick={() => onNavigateTo('concentrates')}>
-            Vapes →
+            <span className="header-zone">Zone 7a &mdash; St. Louis, MO</span>
+          </div>
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen(o => !o)}
+            aria-label={sidebarOpen ? 'Close filters' : 'Open filters'}
+            aria-expanded={sidebarOpen}
+          >
+            Filters
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Left Sidebar - Plant List */}
-      <div className="plants-sidebar">
-        <h2>Plants</h2>
-        <div className="plants-filter-row">
-          {STRAIN_STATUS_FILTERS.map(status => (
-            <button
-              key={status}
-              type="button"
-              className={`strain-filter-btn ${selectedStrainStatus === status ? 'active' : ''}`}
-              onClick={() => setSelectedStrainStatus(status)}
-            >
-              {status === 'all' ? 'All' : status}
-            </button>
-          ))}
+      <div className="app-body">
+        <div className={`sidebar-overlay${sidebarOpen ? ' visible' : ''}`}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+
+        <div className={`sidebar-wrap${sidebarOpen ? ' open' : ''}`}>
+          <FilterPanel
+            filters={filters}
+            onChange={handleFilterChange}
+            resultCount={filtered.length}
+            totalCount={ALL_PLANTS.length}
+          />
         </div>
-        <div className="plants-list">
-          {plants.length === 0 ? (
-            <div className="no-plants">
-              <p>No plants in database yet.</p>
+
+        <main className="plant-grid-area">
+          {filtered.length === 0 ? (
+            <div className="no-results">
+              <p>No plants match the current filters.</p>
+              <button
+                className="clear-btn"
+                onClick={() => setFilters(DEFAULT_FILTERS)}
+              >
+                Clear all filters
+              </button>
             </div>
           ) : (
-            plants.map(plant => (
-              <div 
-                key={plant._id} 
-                className={`plant-list-item ${expandedPlantId === plant._id ? 'active' : ''}`}
-                onClick={() => setExpandedPlantId(expandedPlantId === plant._id ? null : plant._id)}
-              >
-                {plant.strain_image && (
-                  <img className="list-strain-image" src={plant.strain_image} alt={plant.product_name || plant.uid} />
-                )}
-                <div className="list-item-header">
-                  <h4>{plant.product_name || plant.genotype?.strain_name || 'Unknown Strain'}</h4>
-                  <span className="list-item-id">{plant.uid}</span>
-                </div>
-                {plant.strain_status && (
-                  <span className="strain-status-badge">{plant.strain_status}</span>
-                )}
-                {plant.vibe_cluster && plant.vibe_cluster !== 'unclassified' && (
-                  <span className="vibe-badge">{plant.vibe_cluster}</span>
-                )}
-              </div>
-            ))
+            <div className="plant-grid">
+              {filtered.map(plant => (
+                <PlantCard
+                  key={plant.botanical_name}
+                  plant={plant}
+                  onClick={() => setSelectedPlant(plant)}
+                />
+              ))}
+            </div>
           )}
-        </div>
+        </main>
       </div>
 
-      {/* Middle - Expanded Details */}
-      {expandedPlant && (
-        <div className="plants-middle">
-          <button 
-            className="close-btn"
-            onClick={() => setExpandedPlantId(null)}
-          >
-            ✕
-          </button>
-
-          <div className="expanded-content">
-            {expandedPlant.strain_image && (
-              <img className="expanded-strain-image" src={expandedPlant.strain_image} alt={expandedPlant.product_name || expandedPlant.uid} />
-            )}
-            <h2>{expandedPlant.product_name || expandedPlant.genotype?.strain_name || 'Unknown Strain'}</h2>
-            <p className="plant-id">{expandedPlant.uid}</p>
-
-              {/* VIBE Cluster Section */}
-            {expandedPlant.vibe_cluster && expandedPlant.vibe_cluster !== 'unclassified' && (
-              <div className="section">
-                <h1>Genotype:</h1>
-                <h3>VIBE Cluster: {expandedPlant.vibe_cluster}</h3>
-                <div className="section-content">
-                  {getClusterInfo(expandedPlant.vibe_cluster) && (
-                    <>
-                      <h3><strong>Primary Terpene Drivers:</strong></h3>
-                      <h4 className="terpenes">
-                        {getClusterInfo(expandedPlant.vibe_cluster).primary_terpene_drivers.join(', ')}
-                      </h4>
-                      <h3><strong>Tasting Notes:</strong></h3>
-                      <h4 className="tasting-notes">
-                        {getClusterInfo(expandedPlant.vibe_cluster).tasting_notes.join(', ')}
-                      </h4>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          
-
-            {/* Concentrates Section */}
-            {plantConcentrates.length > 0 && (
-              <div className="section">
-                <h3>Concentrates ({plantConcentrates.length})</h3>
-                <div className="concentrates-list">
-                  {plantConcentrates.map(conc => (
-                    <div key={conc._id} className="concentrate-item">
-                      <div className="concentrate-header">
-                        <div>
-                          <h4>{conc.product_name || conc.uid}</h4>
-                          <p className="concentrate-uid">{conc.uid}</p>
-                        </div>
-                        <span className="status-badge" data-status={conc.status}>
-                          {conc.status}
-                        </span>
-                      </div>
-                      {conc.type && (
-                        <p><strong>Type:</strong> {conc.type}</p>
-                      )}
-                      {conc.lineage && conc.lineage.length > 0 && (
-                        <p><strong>Lineage:</strong> {conc.lineage.join(' × ')}</p>
-                      )}
-                      {conc.vibe_cluster && (
-                        <p><strong>Cluster:</strong> {conc.vibe_cluster}</p>
-                      )}
-                      {conc.terpenes?.primary_drivers && conc.terpenes.primary_drivers.length > 0 && (
-                        <p><strong>Terpenes:</strong> {conc.terpenes.primary_drivers.join(', ')}</p>
-                      )}
-                      {conc.potency && (
-                        <>
-                          {conc.potency.thc_percentage && (
-                            <p><strong>THC:</strong> {conc.potency.thc_percentage}%</p>
-                          )}
-                          {conc.potency.cbd_percentage && (
-                            <p><strong>CBD:</strong> {conc.potency.cbd_percentage}%</p>
-                          )}
-                        </>
-                      )}
-                      {conc.yield && (
-                        <p><strong>Yield:</strong> {conc.yield.yield_percentage?.toFixed(2)}%</p>
-                      )}
-                      {conc.batch_number && (
-                        <p><strong>Batch:</strong> {conc.batch_number}</p>
-                      )}
-                      {conc.lab_url && (
-                        <p>
-                          <a 
-                            href={conc.lab_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="lab-link"
-                          >
-                            Lab Analysis →
-                          </a>
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Tags & Notes */}
-            {expandedPlant.tags && expandedPlant.tags.length > 0 && (
-              <div className="section">
-                <h3>Tags</h3>
-                <div className="plant-tags">
-                  {/* {expandedPlant.tags.map((tag, i) => (
-                    <span key={i} className="tag">{tag}</span>
-                  ))} */}
-                </div>
-              </div>
-            )}
-
-            {expandedPlant.notes && (
-              <div className="section">
-                <h3>Notes</h3>
-                <p className="plant-notes">{expandedPlant.notes}</p>
-              </div>
-            )}
-
-            <p className="plant-date">
-              Added: {new Date(expandedPlant.created_at).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
+      {selectedPlant && (
+        <PlantModal
+          plant={selectedPlant}
+          onClose={() => setSelectedPlant(null)}
+        />
       )}
-
-      {/* Right Sidebar - Empty or additional info */}
-      <div className="plants-right">
-        {expandedPlant ? (
-          <div className="right-content">
-            <h3>Summary</h3>
-            <p><strong>UID:</strong> {expandedPlant.uid}</p>
-            <p><strong>Status:</strong> {expandedPlant.strain_status || 'Unknown'}</p>
-            <p><strong>Strain Type:</strong> {expandedPlant.strain_type || 'N/A'}</p>
-            <p><strong>Sex:</strong> {expandedPlant.genotype?.sex || 'Unknown'}</p>
-            {expandedPlant.vibe_cluster !== 'unclassified' && (
-              <p><strong>Cluster:</strong> {expandedPlant.vibe_cluster}</p>
-            )}
-            <p><strong>Concentrates:</strong> {plantConcentrates.length}</p>
-          </div>
-        ) : (
-          <div className="right-placeholder">
-            <p>Select a plant to view details</p>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
+
+export default Plants;

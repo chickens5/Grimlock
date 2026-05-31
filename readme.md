@@ -1,18 +1,20 @@
-# Grimlock - Plant Research & JSX Art
+# Grimlock 
+  # - A Medium Scale Agriculture Management app that was built around Cannabis Cultivation
 
-A full-stack web application for plant research with genotype/phenotype tracking and ML-ready data architecture.
+Welcome
+I built this full-stack web application while I was working as a Cultivation Technician for Vibe Cannabis.
+
+I orginally planned on deploying this through Heroku for backend management, so I left my position and
+thus this has Full CRUD operations, but should only be deployed locally.
+
+Overall, is a great scaffold for plant management and eventually ML features for hydroponics.
 
 
 ## Project Overview
 
-Grimlock is designed for plant breeders and researchers to:
-- Track plant genotype and phenotype data
-- Record environmental conditions during grow cycles
-- Store lab analysis results (cannabinoids, terpenes, etc.)
-- Prepare datasets for ML models to detect stress, disease, and optimize breeding
 
-**Current Status**: Frontend homepage with aurora animation + Plant research database UI  
-**Next Phase**: Data input forms, observation recording, lab result integration
+**Current Status**: Frontend homepage with aurora animation + Plant management UI 
+**Currently Implementing**: Data input forms, observation recording, ML features
 
 ## Tech Stack
 
@@ -28,14 +30,14 @@ Grimlock/
 ├── index.jsx                 # Main app entry
 ├── index.html               # HTML template
 ├── vite.config.js          # Vite configuration
-├── .env                    # Environment variables (create locally — not committed)
+├── .env                    # Environment variables (local enviornment unless you decide to host APIs elsewhere)
 ├── src/
 │   ├── pages/
 │   │   ├── Home.jsx        # Homepage with aurora background
 │   │   ├── Home.css
-│   │   ├── Plants.jsx      # Plant research database page
+│   │   ├── Plants.jsx      # Plant list and grow condition/research database page  
 │   │   ├── Plants.css
-│   │   ├── Concentrates.jsx # Vape & concentrates database page
+│   │   ├── Concentrates.jsx # Vape & concentrates database page (IP)
 │   │   └── Concentrates.css
 │   └── components/
 │       ├── SoftAurora.jsx   # WebGL aurora animation
@@ -45,7 +47,7 @@ Grimlock/
 │   ├── models/
 │   │   ├── Plant.js
 │   │   ├── Concentrate.js
-│   │   ├── Observation.js
+│   │   ├── Observation.js #defines the models for our db
 │   │   ├── GrowCycle.js
 │   │   ├── LabResult.js
 │   │   └── MLDataset.js

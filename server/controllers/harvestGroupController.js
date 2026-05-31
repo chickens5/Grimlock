@@ -5,6 +5,29 @@ function normalizeHarGrp(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizeOptionalString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function resolveCultivarName(value) {
+  if (!value || typeof value !== 'object') return '';
+  return normalizeOptionalString(value.cultivar_name || value.strain_name);
+}
+
+function normalizePlantEntry(plant) {
+  const cultivar_name = resolveCultivarName(plant);
+  if (!cultivar_name) return null;
+
+  return {
+    cultivar_name,
+    // Keep legacy key populated for older clients until fully migrated.
+    strain_name: cultivar_name,
+    plant_count: Number(plant?.plant_count) || 1,
+    current_room: normalizeOptionalString(plant?.current_room),
+    notes: normalizeOptionalString(plant?.notes)
+  };
+}
+
 export const getHarvestGroups = async (req, res, next) => {
   try {
     const [groups, observationStats] = await Promise.all([
@@ -59,7 +82,10 @@ export const createHarvestGroup = async (req, res, next) => {
       har_grp,
       current_room: req.body.current_room || '',
       notes: req.body.notes || '',
-      plants: Array.isArray(req.body.plants) ? req.body.plants : []
+      image_url: normalizeOptionalString(req.body.image_url),
+      plants: Array.isArray(req.body.plants)
+        ? req.body.plants.map(normalizePlantEntry).filter(Boolean)
+        : []
     });
 
     const saved = await group.save();
@@ -78,6 +104,14 @@ export const updateHarvestGroup = async (req, res, next) => {
 
     if (typeof payload.har_grp === 'string') {
       payload.har_grp = normalizeHarGrp(payload.har_grp);
+    }
+
+    if (payload.image_url != null) {
+      payload.image_url = normalizeOptionalString(payload.image_url);
+    }
+
+    if (Array.isArray(payload.plants)) {
+      payload.plants = payload.plants.map(normalizePlantEntry).filter(Boolean);
     }
 
     const group = await HarvestGroup.findByIdAndUpdate(
@@ -122,16 +156,17 @@ export const getPlantsByHarvestGroup = async (req, res, next) => {
 
 export const addPlantToHarvestGroup = async (req, res, next) => {
   try {
-    const strain_name = typeof req.body.strain_name === 'string' ? req.body.strain_name.trim() : '';
-    if (!strain_name) {
-      return res.status(400).json({ message: 'strain_name is required' });
+    const cultivar_name = resolveCultivarName(req.body);
+    if (!cultivar_name) {
+      return res.status(400).json({ message: 'cultivar_name is required' });
     }
 
     const group = await HarvestGroup.findById(req.params.id);
     if (!group) return res.status(404).json({ message: 'Harvest group not found' });
 
     group.plants.push({
-      strain_name,
+      cultivar_name,
+      strain_name: cultivar_name,
       plant_count: Number(req.body.plant_count) || 1,
       current_room: req.body.current_room || '',
       notes: req.body.notes || ''
@@ -153,8 +188,10 @@ export const updatePlantInHarvestGroup = async (req, res, next) => {
     const plant = group.plants.id(req.params.plantId);
     if (!plant) return res.status(404).json({ message: 'Plant entry not found in harvest group' });
 
-    if (typeof req.body.strain_name === 'string' && req.body.strain_name.trim()) {
-      plant.strain_name = req.body.strain_name.trim();
+    const cultivar_name = resolveCultivarName(req.body);
+    if (cultivar_name) {
+      plant.cultivar_name = cultivar_name;
+      plant.strain_name = cultivar_name;
     }
 
     if (req.body.plant_count != null) {
@@ -189,7 +226,7 @@ export const deletePlantFromHarvestGroup = async (req, res, next) => {
     if (!plant) return res.status(404).json({ message: 'Plant entry not found in harvest group' });
 
     const removedPlantId = String(plant._id);
-    const removedPlantName = plant.strain_name;
+    const removedPlantName = plant.cultivar_name || plant.strain_name;
     plant.deleteOne();
 
     await group.save();

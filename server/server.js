@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 
 import plantRoutes from './routes/plants.js';
 import observationRoutes from './routes/observations.js';
@@ -9,6 +10,7 @@ import concentrateRoutes from './routes/concentrates.js';
 import harvestGroupRoutes from './routes/harvest-groups.js';
 import labResultRoutes from './routes/lab-results.js';
 import mlDatasetRoutes from './routes/ml-datasets.js';
+import uploadsRoutes from './routes/uploads.js';
 
 dotenv.config();
 
@@ -31,6 +33,7 @@ app.use(cors({
   }
 }));
 app.use(express.json());
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // MongoDB Connection
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/grimlock';
@@ -48,6 +51,7 @@ app.use('/api/concentrates', concentrateRoutes);
 app.use('/api/harvest-groups', harvestGroupRoutes);
 app.use('/api/lab-results', labResultRoutes);
 app.use('/api/ml-datasets', mlDatasetRoutes);
+app.use('/api/uploads', uploadsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

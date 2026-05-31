@@ -24,14 +24,14 @@ export default function Home({ onNavigateTo }) {
       
       <div className="home-content">
         <h1>Grimlock</h1>
-        <p className="tagline">Plant Research & JSX Art</p>
+        <p className="tagline">Manage plant growth, inventory, hydroponic ML assistance, and explore native plants.</p>
         
         <nav className="home-nav">
           <button 
             className="nav-button"
             onClick={() => onNavigateTo('plants')}
           >
-            Cultivars
+            Explore Native Plants!
           </button>
           <button
             className="nav-button"

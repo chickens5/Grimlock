@@ -35,11 +35,12 @@ function isImageMedia(item) {
 const EMPTY_GROUP_FORM = {
   har_grp: '',
   current_room: '',
-  notes: ''
+  notes: '',
+  image_url: ''
 };
 
 const EMPTY_GROUP_PLANT_FORM = {
-  strain_name: '',
+  cultivar_name: '',
   plant_count: 1,
   current_room: '',
   notes: ''
@@ -56,6 +57,7 @@ const EMPTY_OBSERVATION_FORM = {
   temp_c: '',
   humidity_pct: '',
   vpd_kpa: '',
+  observ_img: '',
   data_quality: '',
   recorded_by: ''
 };
@@ -74,12 +76,17 @@ function toDateTimeInputValue(value) {
   return new Date(date.getTime() - localOffsetMs).toISOString().slice(0, 16);
 }
 
+function getCultivarName(plant) {
+  if (!plant || typeof plant !== 'object') return '';
+  return (plant.cultivar_name || plant.strain_name || '').trim();
+}
+
 function buildObservationPayload(formState, selectedHarvestGroup, selectedPlant) {
   return {
     har_grp: selectedHarvestGroup?.har_grp,
     plant_id: String(selectedPlant?._id || ''),
     hg_plant_id: String(selectedPlant?._id || ''),
-    plant_name: selectedPlant?.strain_name,
+    plant_name: getCultivarName(selectedPlant),
     recorded_at: formState.recorded_at ? new Date(formState.recorded_at).toISOString() : new Date().toISOString(),
     growth_stage: formState.growth_stage,
     morphology: {
@@ -96,6 +103,7 @@ function buildObservationPayload(formState, selectedHarvestGroup, selectedPlant)
       humidity_pct: toOptionalNumber(formState.humidity_pct),
       vpd_kpa: toOptionalNumber(formState.vpd_kpa)
     },
+    observ_img: formState.observ_img || undefined,
     data_quality: toOptionalNumber(formState.data_quality),
     recorded_by: formState.recorded_by || undefined
   };
@@ -113,6 +121,7 @@ function mapObservationToForm(observation) {
     temp_c: observation.environment_snapshot?.temp_c ?? '',
     humidity_pct: observation.environment_snapshot?.humidity_pct ?? '',
     vpd_kpa: observation.environment_snapshot?.vpd_kpa ?? '',
+    observ_img: observation.observ_img ?? '',
     data_quality: observation.data_quality ?? '',
     recorded_by: observation.recorded_by ?? ''
   };
@@ -123,31 +132,201 @@ function mapHarvestGroupToForm(group) {
   return {
     har_grp: group.har_grp || '',
     current_room: group.current_room || '',
-    notes: group.notes || ''
+    notes: group.notes || '',
+    image_url: group.image_url || ''
   };
 }
 
 function mapHarvestPlantToForm(plant) {
   if (!plant) return EMPTY_GROUP_PLANT_FORM;
   return {
-    strain_name: plant.strain_name || '',
+    cultivar_name: getCultivarName(plant),
     plant_count: plant.plant_count || 1,
     current_room: plant.current_room || '',
     notes: plant.notes || ''
   };
 }
 
+function ObservationSummary({
+  observation,
+  selectedHarvestGroup,
+  plants,
+  groupPlantTotalCount,
+  selectedPlant,
+  latestObservation
+}) {
+  if (!selectedHarvestGroup) {
+    return <div className="observations-empty-state compact">Select a harvest group to see summary.</div>;
+  }
+
+  return (
+    <div className="observation-summary">
+      <h2>Observation Summary</h2>
+      <p className="observation-footer">
+        Recorded by {observation.recorded_by || 'unknown'} on {formatDate(observation.recorded_at)}
+      </p>
+
+      <div className="observation-summary-grid">
+        <div className="observation-summary-item">
+          <span className="summary-label">Harvest Group</span>
+          <span className="summary-value">{selectedHarvestGroup.har_grp}</span>
+        </div>
+        <div className="observation-summary-item">
+          <span className="summary-label">Room</span>
+          <span className="summary-value">{selectedHarvestGroup.current_room || 'Unassigned'}</span>
+        </div>
+        <div className="observation-summary-item">
+          <span className="summary-label">Total Plants In HG</span>
+          <span className="summary-value">{plants.length}</span>
+        </div>
+        <div className="observation-summary-item">
+          <span className="summary-label">Plants In HG</span>
+          <span className="summary-value">{groupPlantTotalCount}</span>
+        </div>
+        <div className="observation-summary-item">
+          <span className="summary-label">Selected Cultivar/Plant</span>
+          <span className="summary-value">{getCultivarName(selectedPlant) || 'None selected'}</span>
+        </div>
+        <div className="observation-summary-item">
+          <span className="summary-label">Latest Stage</span>
+          <span className="summary-value">{latestObservation ? formatStage(latestObservation.growth_stage) : 'No data'}</span>
+        </div>
+
+        {observation.har_grp && (
+          <div className="observation-summary-item">
+            <span className="summary-label">Group</span>
+            <span className="summary-value">{observation.har_grp}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ObservationCardDetails({ observation, resolveImageUrl }) {
+  return (
+    <>
+      {(observation.morphology?.height_cm || observation.morphology?.canopy_width_cm || observation.morphology?.leaf_count || observation.morphology?.node_count || observation.morphology?.cola_count) && (
+        <section className="observation-section">
+          <h4>Morphology</h4>
+          <div className="observation-grid">
+            {typeof observation.morphology?.height_cm === 'number' && <p><strong>Height:</strong> {observation.morphology.height_cm} cm</p>}
+            {typeof observation.morphology?.canopy_width_cm === 'number' && <p><strong>Canopy Width:</strong> {observation.morphology.canopy_width_cm} cm</p>}
+            {typeof observation.morphology?.leaf_count === 'number' && <p><strong>Leaf Count:</strong> {observation.morphology.leaf_count}</p>}
+            {typeof (observation.morphology?.node_count ?? observation.morphology?.cola_count) === 'number' && (
+              <p><strong>Node Count:</strong> {observation.morphology.node_count ?? observation.morphology.cola_count}</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {observation.observ_img && (
+        <section className="observation-section">
+          <h4>Observation Image</h4>
+          <a href={resolveImageUrl(observation.observ_img)} target="_blank" rel="noopener noreferrer">
+            <img
+              className="observation-media-image"
+              src={resolveImageUrl(observation.observ_img)}
+              alt={`${observation.plant_name || 'Plant'} observation`}
+              loading="lazy"
+            />
+          </a>
+        </section>
+      )}
+
+      {(typeof observation.health?.overall_score === 'number' || observation.health?.stress_type?.length > 0 || observation.health?.symptoms?.length > 0) && (
+        <section className="observation-section">
+          <h4>Health</h4>
+          {typeof observation.health?.overall_score === 'number' && (
+            <p><strong>Overall Score:</strong> {observation.health.overall_score}/10</p>
+          )}
+          {observation.health?.stress_type?.length > 0 && (
+            <p><strong>Stress Types:</strong> {observation.health.stress_type.join(', ')}</p>
+          )}
+          {observation.health?.symptoms?.length > 0 && (
+            <div className="list-block">
+              <strong>Symptoms:</strong>
+              {observation.health.symptoms.map((symptom, index) => (
+                <p key={`${observation._id}-symptom-${index}`}>
+                  {symptom.type} at {symptom.location || 'unknown location'}
+                  {typeof symptom.severity === 'number' ? `, severity ${symptom.severity}/10` : ''}
+                  {symptom.confirmed_by ? `, confirmed by ${symptom.confirmed_by}` : ''}
+                </p>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {(typeof observation.environment_snapshot?.temp_c === 'number' || typeof observation.environment_snapshot?.humidity_pct === 'number' || typeof observation.environment_snapshot?.vpd_kpa === 'number' || typeof observation.environment_snapshot?.ppfd_umol === 'number') && (
+        <section className="observation-section">
+          <h4>Environment Snapshot</h4>
+          <div className="observation-grid">
+            {typeof observation.environment_snapshot?.temp_c === 'number' && <p><strong>Temp:</strong> {observation.environment_snapshot.temp_c} C</p>}
+            {typeof observation.environment_snapshot?.humidity_pct === 'number' && <p><strong>Humidity:</strong> {observation.environment_snapshot.humidity_pct}%</p>}
+            {typeof observation.environment_snapshot?.vpd_kpa === 'number' && <p><strong>VPD:</strong> {observation.environment_snapshot.vpd_kpa} kPa</p>}
+            {typeof observation.environment_snapshot?.ppfd_umol === 'number' && <p><strong>PPFD:</strong> {observation.environment_snapshot.ppfd_umol} umol</p>}
+            {typeof observation.environment_snapshot?.co2_ppm === 'number' && <p><strong>CO2:</strong> {observation.environment_snapshot.co2_ppm} ppm</p>}
+            {typeof observation.environment_snapshot?.photoperiod_hrs === 'number' && <p><strong>Photoperiod:</strong> {observation.environment_snapshot.photoperiod_hrs} hrs</p>}
+          </div>
+        </section>
+      )}
+
+      {observation.media?.length > 0 && (
+        <section className="observation-section">
+          <h4>Media</h4>
+          <div className="observation-media-grid">
+            {observation.media.map((item, index) => (
+              <div key={`${observation._id}-media-${index}`} className="observation-media-item">
+                <p className="observation-media-label">
+                  <strong>{item.type || 'Media'}</strong>
+                  {item.angle ? ` (${item.angle})` : ''}
+                </p>
+                {isImageMedia(item) ? (
+                  <a href={item.url} target="_blank" rel="noopener noreferrer">
+                    <img
+                      className="observation-media-image"
+                      src={item.url}
+                      alt={`${item.type || 'Media'} ${item.angle || ''}`.trim()}
+                      loading="lazy"
+                    />
+                  </a>
+                ) : (
+                  <a
+                    className="observation-media-link"
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {item.url}
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
 export default function Observations({ onNavigateTo }) {
   const [harvestGroups, setHarvestGroups] = useState([]);
   const [selectedHarvestGroupId, setSelectedHarvestGroupId] = useState(null);
   const [selectedPlantId, setSelectedPlantId] = useState(null);
+  const [groupManageMode, setGroupManageMode] = useState('edit'); // 'create' | 'edit'
+  const [plantManageMode, setPlantManageMode] = useState('edit'); // 'create' | 'edit'
 
   const [groupFormState, setGroupFormState] = useState(EMPTY_GROUP_FORM);
   const [newHarvestGroupKey, setNewHarvestGroupKey] = useState('');
   const [groupFormSubmitting, setGroupFormSubmitting] = useState(false);
   const [groupPlantFormState, setGroupPlantFormState] = useState(EMPTY_GROUP_PLANT_FORM);
-  const [newStrainName, setNewStrainName] = useState('');
+  const [newCultivarName, setNewCultivarName] = useState('');
   const [groupPlantFormSubmitting, setGroupPlantFormSubmitting] = useState(false);
+  const [groupImageFile, setGroupImageFile] = useState(null);
+  const [observationImageFile, setObservationImageFile] = useState(null);
+  const [groupImagePreviewUrl, setGroupImagePreviewUrl] = useState('');
+  const [observationImagePreviewUrl, setObservationImagePreviewUrl] = useState('');
 
   const [observations, setObservations] = useState([]);
   const [harvestLoading, setHarvestLoading] = useState(true);
@@ -158,6 +337,7 @@ export default function Observations({ onNavigateTo }) {
   const [viewMode, setViewMode] = useState('observations'); // 'observations' or 'manage'
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [crudPopup, setCrudPopup] = useState({ open: false, message: '' });
 
   const selectedHarvestGroup = useMemo(
     () => harvestGroups.find(group => group._id === selectedHarvestGroupId) || null,
@@ -171,9 +351,39 @@ export default function Observations({ onNavigateTo }) {
     [plants, selectedPlantId]
   );
 
+  const resolveImageUrl = (url) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url) || url.startsWith('data:') || url.startsWith('blob:')) {
+      return url;
+    }
+    return apiUrl(url.startsWith('/') ? url : `/${url}`);
+  };
+
   const clearMessages = () => {
     setError(null);
     setNotice(null);
+  };
+
+  const showCrudSuccess = (message) => {
+    setNotice(message);
+    setCrudPopup({ open: true, message });
+  };
+
+  const uploadImageFile = async (file, category) => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(apiUrl(`/api/uploads/image?category=${encodeURIComponent(category)}`), {
+      method: 'POST',
+      body: formData
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.url) {
+      throw new Error(payload?.message || 'Image upload failed');
+    }
+
+    return payload.url;
   };
 
   const requestJson = async (path, options = {}, fallbackMessage = 'Request failed') => {
@@ -216,7 +426,11 @@ export default function Observations({ onNavigateTo }) {
 
     if (!resolvedGroup) {
       setSelectedPlantId(null);
-      return;
+      return {
+        groups,
+        resolvedGroup: null,
+        resolvedPlant: null
+      };
     }
 
     const groupPlants = resolvedGroup.plants || [];
@@ -227,6 +441,12 @@ export default function Observations({ onNavigateTo }) {
       null;
 
     setSelectedPlantId(resolvedPlant?._id || null);
+
+    return {
+      groups,
+      resolvedGroup,
+      resolvedPlant
+    };
   };
 
   useEffect(() => {
@@ -245,13 +465,48 @@ export default function Observations({ onNavigateTo }) {
   }, []);
 
   useEffect(() => {
+    if (groupManageMode !== 'edit') return;
     setGroupFormState(mapHarvestGroupToForm(selectedHarvestGroup));
-  }, [selectedHarvestGroup]);
+    setGroupImageFile(null);
+  }, [selectedHarvestGroup, groupManageMode]);
 
   useEffect(() => {
+    if (plantManageMode !== 'edit') return;
     setGroupPlantFormState(mapHarvestPlantToForm(selectedPlant));
-    setNewStrainName('');
-  }, [selectedPlant]);
+    setNewCultivarName('');
+  }, [selectedPlant, plantManageMode]);
+
+  useEffect(() => {
+    if (!crudPopup.open) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setCrudPopup({ open: false, message: '' });
+    }, 1800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [crudPopup]);
+
+  useEffect(() => {
+    if (!groupImageFile) {
+      setGroupImagePreviewUrl('');
+      return undefined;
+    }
+
+    const nextUrl = URL.createObjectURL(groupImageFile);
+    setGroupImagePreviewUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [groupImageFile]);
+
+  useEffect(() => {
+    if (!observationImageFile) {
+      setObservationImagePreviewUrl('');
+      return undefined;
+    }
+
+    const nextUrl = URL.createObjectURL(observationImageFile);
+    setObservationImagePreviewUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [observationImageFile]);
 
   useEffect(() => {
     if (!selectedPlantId || !selectedHarvestGroup) {
@@ -279,17 +534,127 @@ export default function Observations({ onNavigateTo }) {
   }, [selectedPlantId, selectedHarvestGroup]);
 
   const refreshCurrentData = async ({ preferredGroupId, preferredPlantId } = {}) => {
-    await loadHarvestGroups({ preferredGroupId, preferredPlantId });
+    return loadHarvestGroups({ preferredGroupId, preferredPlantId });
+  };
+
+  const refreshSelectionAndObservations = async ({ preferredGroupId, preferredPlantId } = {}) => {
+    const data = await refreshCurrentData({ preferredGroupId, preferredPlantId });
+    const nextGroup = data?.resolvedGroup;
+    const nextPlant = data?.resolvedPlant;
+
+    if (nextGroup?.har_grp && nextPlant?._id) {
+      await loadObservationsForSelection(nextPlant._id, nextGroup.har_grp);
+    } else {
+      setObservations([]);
+    }
+
+    return data;
   };
 
   const resetForm = () => {
     setEditingObservationId(null);
     setFormState(EMPTY_OBSERVATION_FORM);
+    setObservationImageFile(null);
   };
 
   const handleEditObservation = (observation) => {
     setEditingObservationId(observation._id);
     setFormState(mapObservationToForm(observation));
+  };
+
+  const isManagingExistingGroup = groupManageMode === 'edit' && Boolean(selectedHarvestGroup);
+  const isManagingExistingPlant = plantManageMode === 'edit' && Boolean(selectedPlant);
+
+  const startNewHarvestGroup = () => {
+    clearMessages();
+    setGroupManageMode('create');
+    setPlantManageMode('create');
+    setSelectedHarvestGroupId(null);
+    setSelectedPlantId(null);
+    setGroupFormState(EMPTY_GROUP_FORM);
+    setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
+    setNewHarvestGroupKey('');
+    setNewCultivarName('');
+    setGroupImageFile(null);
+  };
+
+  const startNewPlant = () => {
+    clearMessages();
+    setPlantManageMode('create');
+    setSelectedPlantId(null);
+    setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
+    setNewCultivarName('');
+  };
+
+  const selectGroupById = (groupId) => {
+    const group = harvestGroups.find(item => String(item._id) === String(groupId));
+    if (!group) {
+      startNewHarvestGroup();
+      return;
+    }
+
+    clearMessages();
+    setGroupManageMode('edit');
+    setSelectedHarvestGroupId(group._id);
+    setGroupFormState(mapHarvestGroupToForm(group));
+    setNewHarvestGroupKey('');
+
+    const nextPlant = (group.plants || []).find(item => String(item._id) === String(selectedPlantId)) || (group.plants || [])[0] || null;
+    if (!nextPlant) {
+      setSelectedPlantId(null);
+      setPlantManageMode('create');
+      setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
+      setNewCultivarName('');
+      return;
+    }
+
+    setSelectedPlantId(nextPlant._id);
+    setPlantManageMode('edit');
+    setGroupPlantFormState(mapHarvestPlantToForm(nextPlant));
+    setNewCultivarName('');
+  };
+
+  const handleObservationGroupSelection = (groupId) => {
+    if (!groupId) {
+      setSelectedHarvestGroupId(null);
+      setSelectedPlantId(null);
+      setPlantManageMode('create');
+      return;
+    }
+    selectGroupById(groupId);
+  };
+
+  const handleObservationPlantSelection = (plantId) => {
+    if (!plantId) {
+      setSelectedPlantId(null);
+      setPlantManageMode('create');
+      return;
+    }
+
+    const plant = plants.find(item => String(item._id) === String(plantId));
+    if (!plant) return;
+    setSelectedPlantId(plant._id);
+    setPlantManageMode('edit');
+  };
+
+  const cancelNewHarvestGroup = () => {
+    const fallbackGroup = selectedHarvestGroup || harvestGroups[0] || null;
+    if (!fallbackGroup) return;
+    selectGroupById(fallbackGroup._id);
+  };
+
+  const cancelNewPlant = () => {
+    const fallbackPlant = selectedPlant || plants[0] || null;
+    if (!fallbackPlant) {
+      startNewPlant();
+      return;
+    }
+
+    clearMessages();
+    setPlantManageMode('edit');
+    setSelectedPlantId(fallbackPlant._id);
+    setGroupPlantFormState(mapHarvestPlantToForm(fallbackPlant));
+    setNewCultivarName('');
   };
 
   const handleDeleteObservation = async (observationId) => {
@@ -305,15 +670,15 @@ export default function Observations({ onNavigateTo }) {
         method: 'DELETE'
       }, 'Failed to delete observation');
 
-      setNotice('Observation deleted.');
+      showCrudSuccess('Observation deleted.');
       if (editingObservationId === observationId) {
         resetForm();
       }
 
-      await refreshCurrentData({ preferredGroupId: selectedHarvestGroup?._id, preferredPlantId: selectedPlant?._id });
-      if (selectedPlantId && selectedHarvestGroup?.har_grp) {
-        await loadObservationsForSelection(selectedPlantId, selectedHarvestGroup.har_grp);
-      }
+      await refreshSelectionAndObservations({
+        preferredGroupId: selectedHarvestGroup?._id,
+        preferredPlantId: selectedPlant?._id
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -339,10 +704,23 @@ export default function Observations({ onNavigateTo }) {
     setFormSubmitting(true);
     clearMessages();
 
-    const payload = buildObservationPayload(formState, selectedHarvestGroup, selectedPlant);
     const isEditing = Boolean(editingObservationId);
 
     try {
+      let observationImageUrl = formState.observ_img;
+      if (observationImageFile) {
+        observationImageUrl = await uploadImageFile(observationImageFile, 'observation');
+      }
+
+      const payload = buildObservationPayload(
+        {
+          ...formState,
+          observ_img: observationImageUrl
+        },
+        selectedHarvestGroup,
+        selectedPlant
+      );
+
       await requestJson(
         isEditing ? `/api/observations/${editingObservationId}` : '/api/observations',
         {
@@ -356,10 +734,12 @@ export default function Observations({ onNavigateTo }) {
       );
 
       resetForm();
-      setNotice(isEditing ? 'Observation updated.' : 'Observation created.');
+      showCrudSuccess(isEditing ? 'Observation updated.' : 'Observation created.');
 
-      await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id, preferredPlantId: selectedPlant._id });
-      await loadObservationsForSelection(selectedPlantId, selectedHarvestGroup.har_grp);
+      await refreshSelectionAndObservations({
+        preferredGroupId: selectedHarvestGroup._id,
+        preferredPlantId: selectedPlant._id
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -369,18 +749,14 @@ export default function Observations({ onNavigateTo }) {
 
   const handleGroupFormChange = (event) => {
     const { name, value } = event.target;
-    
+
     if (name === 'group_id') {
-      // Handle group selection by ID
-      const group = harvestGroups.find(group => String(group._id) === String(value));
-      if (group) {
-        setSelectedHarvestGroupId(group._id);
-        setGroupFormState(mapHarvestGroupToForm(group));
-        setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
-        setNewHarvestGroupKey('');
+      if (!value) {
+        startNewHarvestGroup();
+        return;
       }
-    } else if (name === 'har_grp' && !selectedHarvestGroup) {
-      // Only allow har_grp changes when creating new group
+      selectGroupById(value);
+    } else if (name === 'har_grp' && groupManageMode === 'create') {
       setGroupFormState(current => ({
         ...current,
         [name]: value
@@ -396,20 +772,25 @@ export default function Observations({ onNavigateTo }) {
     clearMessages();
 
     try {
-      if (selectedHarvestGroup) {
-        // Update existing group - cannot modify har_grp
+      let groupImageUrl = groupFormState.image_url;
+      if (groupImageFile) {
+        groupImageUrl = await uploadImageFile(groupImageFile, 'harvest-group');
+      }
+
+      if (isManagingExistingGroup) {
         await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             current_room: groupFormState.current_room,
-            notes: groupFormState.notes
+            notes: groupFormState.notes,
+            image_url: groupImageUrl
           })
         }, 'Failed to update harvest group');
 
-        setNotice(`Harvest group ${selectedHarvestGroup.har_grp} updated.`);
+        showCrudSuccess(`Harvest group ${selectedHarvestGroup.har_grp} updated.`);
+        await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id, preferredPlantId: selectedPlantId });
       } else {
-        // Create new group
         const harGrpValue = (newHarvestGroupKey || groupFormState.har_grp || '').trim();
         if (!harGrpValue) {
           throw new Error('Provide a harvest group key.');
@@ -421,17 +802,18 @@ export default function Observations({ onNavigateTo }) {
           body: JSON.stringify({
             har_grp: harGrpValue,
             current_room: groupFormState.current_room,
-            notes: groupFormState.notes
+            notes: groupFormState.notes,
+            image_url: groupImageUrl
           })
         }, 'Failed to create harvest group');
 
-        setNotice(`Harvest group ${createdGroup.har_grp} created.`);
+        showCrudSuccess(`Harvest group ${createdGroup.har_grp} created.`);
         await refreshCurrentData({ preferredGroupId: createdGroup._id });
+        setGroupManageMode('edit');
+        setPlantManageMode('create');
       }
-
-      setGroupFormState(mapHarvestGroupToForm(selectedHarvestGroup || null));
-      setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
       setNewHarvestGroupKey('');
+      setGroupImageFile(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -439,14 +821,8 @@ export default function Observations({ onNavigateTo }) {
     }
   };
 
-  const handleUpdateHarvestGroup = async () => {
-    // This is now handled by handleCreateHarvestGroup
-    // Keeping this for backwards compatibility but redirecting to the combined handler
-    return handleCreateHarvestGroup({ preventDefault: () => {} });
-  };
-
   const handleDeleteHarvestGroup = async () => {
-    if (!selectedHarvestGroup) {
+    if (!isManagingExistingGroup) {
       setError('Select a harvest group to delete.');
       return;
     }
@@ -463,11 +839,22 @@ export default function Observations({ onNavigateTo }) {
         method: 'DELETE'
       }, 'Failed to delete harvest group');
 
-      setNotice(`Harvest group ${selectedHarvestGroup.har_grp} deleted.`);
+      showCrudSuccess(`Harvest group ${selectedHarvestGroup.har_grp} deleted.`);
       setGroupFormState(EMPTY_GROUP_FORM);
       setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
       setObservations([]);
-      await refreshCurrentData({});
+      setGroupImageFile(null);
+      const data = await refreshCurrentData({});
+
+      if (data?.resolvedGroup) {
+        setGroupManageMode('edit');
+        setPlantManageMode(data.resolvedPlant ? 'edit' : 'create');
+      } else {
+        setGroupManageMode('create');
+        setPlantManageMode('create');
+        setSelectedHarvestGroupId(null);
+        setSelectedPlantId(null);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -477,19 +864,24 @@ export default function Observations({ onNavigateTo }) {
 
   const handleGroupPlantFormChange = (event) => {
     const { name, value } = event.target;
-    
+
     if (name === 'plant_id') {
-      // Handle plant selection by ID
+      if (!value) {
+        startNewPlant();
+        return;
+      }
+
       const plant = plants.find(plant => String(plant._id) === String(value));
       if (plant) {
         setSelectedPlantId(plant._id);
+        setPlantManageMode('edit');
         setGroupPlantFormState(mapHarvestPlantToForm(plant));
+        setNewCultivarName('');
       }
     } else {
-      // Handle form field changes
       setGroupPlantFormState(current => ({
         ...current,
-        [name]: name === 'plant_count' ? value : value
+        [name]: value
       }));
     }
   };
@@ -505,44 +897,55 @@ export default function Observations({ onNavigateTo }) {
     clearMessages();
 
     try {
-      if (selectedPlant) {
-        // Update existing plant
+      if (isManagingExistingPlant) {
         await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants/${selectedPlant._id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            strain_name: groupPlantFormState.strain_name,
+            cultivar_name: groupPlantFormState.cultivar_name,
+            strain_name: groupPlantFormState.cultivar_name,
             plant_count: toOptionalNumber(groupPlantFormState.plant_count) || 1,
             current_room: groupPlantFormState.current_room,
             notes: groupPlantFormState.notes
           })
         }, 'Failed to update harvest-group plant');
 
-        setNotice('Plant updated.');
+        showCrudSuccess('Plant updated.');
+        await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id, preferredPlantId: selectedPlant._id });
+        setPlantManageMode('edit');
       } else {
-        // Create new plant
-        const strainNameValue = (newStrainName || groupPlantFormState.strain_name || '').trim();
-        if (!strainNameValue) {
-          throw new Error('Provide a new strain name or select one from the dropdown.');
+        const cultivarNameValue = (newCultivarName || groupPlantFormState.cultivar_name || '').trim();
+        if (!cultivarNameValue) {
+          throw new Error('Provide a new cultivar name or select one from the dropdown.');
         }
 
-        await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants`, {
+        const updatedGroup = await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            strain_name: strainNameValue,
+            cultivar_name: cultivarNameValue,
+            strain_name: cultivarNameValue,
             plant_count: toOptionalNumber(groupPlantFormState.plant_count) || 1,
             current_room: groupPlantFormState.current_room,
             notes: groupPlantFormState.notes
           })
         }, 'Failed to add plant to harvest group');
 
-        setNotice('Plant added to harvest group.');
+        const normalizedCultivarName = cultivarNameValue.toLowerCase();
+        const updatedPlants = Array.isArray(updatedGroup?.plants) ? updatedGroup.plants : [];
+        const createdPlant = [...updatedPlants].reverse().find(plant =>
+          getCultivarName(plant).toLowerCase() === normalizedCultivarName
+        ) || updatedPlants[updatedPlants.length - 1] || null;
+
+        showCrudSuccess('Plant added to harvest group.');
+        await refreshCurrentData({
+          preferredGroupId: selectedHarvestGroup._id,
+          preferredPlantId: createdPlant?._id || null
+        });
+        setPlantManageMode('edit');
       }
 
-      setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
-      setNewStrainName('');
-      await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id, preferredPlantId: selectedPlant?._id });
+      setNewCultivarName('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -550,19 +953,13 @@ export default function Observations({ onNavigateTo }) {
     }
   };
 
-  const handleUpdateGroupPlant = async () => {
-    // This is now handled by handleCreateGroupPlant
-    // Keeping this for backwards compatibility but redirecting to the combined handler
-    return handleCreateGroupPlant({ preventDefault: () => {} });
-  };
-
   const handleDeleteGroupPlant = async () => {
-    if (!selectedHarvestGroup || !selectedPlant) {
+    if (!selectedHarvestGroup || !isManagingExistingPlant) {
       setError('Select a harvest-group plant to delete.');
       return;
     }
 
-    if (!window.confirm(`Delete ${selectedPlant.strain_name} from ${selectedHarvestGroup.har_grp}?`)) {
+    if (!window.confirm(`Delete ${getCultivarName(selectedPlant)} from ${selectedHarvestGroup.har_grp}?`)) {
       return;
     }
 
@@ -574,11 +971,17 @@ export default function Observations({ onNavigateTo }) {
         method: 'DELETE'
       }, 'Failed to delete harvest-group plant');
 
-      setNotice('Harvest-group plant deleted.');
+      showCrudSuccess('Harvest-group plant deleted.');
       setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
       resetForm();
       setObservations([]);
-      await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id });
+      const data = await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id });
+      if (data?.resolvedPlant) {
+        setPlantManageMode('edit');
+      } else {
+        setPlantManageMode('create');
+        setSelectedPlantId(null);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -598,31 +1001,49 @@ export default function Observations({ onNavigateTo }) {
   }
 
   return (
-    <div className="observations-layout">
+    <div className="observations-page">
+      
       <div className="observations-nav-bar">
         <button className="nav-btn" onClick={() => onNavigateTo('home')}>
           ← Home
         </button>
+        
         <div className="nav-title">Observations</div>
-        <button className="nav-btn" onClick={() => onNavigateTo('concentrates')}>
-          Vapes →
+
+        <button className="nav-btn" onClick={() => onNavigateTo('Plants')}>
+          Explore Native Plants →
         </button>
       </div>
 
+    <div className="observations-layout">
+      
+
+{/* The main content area conditionally renders either the observations view or the management view based on the selected tab in full CRUD mode */}
       <main className="observations-main">
-       
-        {selectedHarvestGroup ? (
-          <>
-          
-             <div className="hg-highlight-card">
-              <h1>Current Harvest Group: {selectedHarvestGroup.har_grp}</h1>
-              <h1>Total Plants: {groupPlantTotalCount}</h1>
-              <h2>Current Room: {selectedHarvestGroup.current_room || 'Unassigned'}</h2>
-              <div className="selected-plant-meta observations-header-actions">
-                    <i><strong>Latest Record:</strong> {selectedHarvestGroup.latest_recorded_at ? formatDate(selectedHarvestGroup.latest_recorded_at) : 'No data'}</i>
-                    <i><strong>Total Observations:</strong> {selectedHarvestGroup.observations_count || 0}</i>
-                  </div>
+
+        <>
+            {selectedHarvestGroup ? (
+              <div className="hg-highlight-card">
+                <h1>Current Harvest Group: {selectedHarvestGroup.har_grp}</h1>
+                <h1>Total Plants: {groupPlantTotalCount}</h1>
+                <h2>Current Room: {selectedHarvestGroup.current_room || 'Unassigned'}</h2>
+                {selectedHarvestGroup.image_url && (
+                  <img
+                    className="manage-preview-image"
+                    src={resolveImageUrl(selectedHarvestGroup.image_url)}
+                    alt={`${selectedHarvestGroup.har_grp} harvest group`}
+                  />
+                )}
+                <div className="selected-plant-meta observations-header-actions">
+                  <i><strong>Latest Record:</strong> {selectedHarvestGroup.latest_recorded_at ? formatDate(selectedHarvestGroup.latest_recorded_at) : 'No data'}</i>
+                  <i><strong>Total Observations:</strong> {selectedHarvestGroup.observations_count || 0}</i>
                 </div>
+              </div>
+            ) : (
+              <div className="observations-empty-state compact">
+                No harvest group selected. Choose one from Observations, or create one in Manage mode.
+              </div>
+            )}
               
              <div className="view-mode-tabs">
                <button
@@ -642,17 +1063,19 @@ export default function Observations({ onNavigateTo }) {
             {error && <div className="error">{error}</div>}
             {notice && <div className="notice">{notice}</div>}
 
+{/* This section renders the observations view (FULL CRUD until we introduce secure mode) */}
             {viewMode === 'observations' ? (
               <>
                 <div className="observations-view">
                   <div className="selected-plant-selection">
                     <label>
                       Select Harvest Group:
-                      <select value={selectedHarvestGroupId || ''} onChange={(e) => setSelectedHarvestGroupId(e.target.value)}>
+                      <select value={selectedHarvestGroupId || ''} onChange={(e) => handleObservationGroupSelection(e.target.value)}>
                         <option value="">Choose a harvest group...</option>
                         {harvestGroups.map(group => (
                           <option key={group._id} value={group._id}>
                             {group.har_grp} (Room: {group.current_room || 'Unassigned'} • {group.plant_total_count || 0} plants)
+
                           </option>
                         ))}
                       </select>
@@ -660,12 +1083,12 @@ export default function Observations({ onNavigateTo }) {
 
                     {plants.length > 0 && (
                       <label>
-                        Select Plant/Strain:
-                        <select value={selectedPlantId || ''} onChange={(e) => setSelectedPlantId(e.target.value)}>
+                        Select Plant/Cultivar:
+                        <select value={selectedPlantId || ''} onChange={(e) => handleObservationPlantSelection(e.target.value)}>
                           <option value="">Choose a plant...</option>
                           {plants.map(plant => (
                             <option key={plant._id} value={plant._id}>
-                              {plant.strain_name} ({plant.plant_count || 1} plants)
+                              {getCultivarName(plant)} ({plant.plant_count || 1} plants)
                             </option>
                           ))}
                         </select>
@@ -673,19 +1096,19 @@ export default function Observations({ onNavigateTo }) {
                     )}
                   </div>
 
+                  {/* The observation form and timeline are only shown when a plant is selected, 
+                  since observations are tied to specific plants within a harvest group */}
+
                   {!selectedPlant ? (
                     <div className="observations-empty-state compact">Select a plant from the dropdown to manage observations.</div>
                   ) : (
                     <>
-                    <div>
-                    
-                    </div>
                       <section className="editor-card inventory-editor">
                         <div className="editor-card-header">
                           <div className ='section'>
                             <h2>{editingObservationId ? 'Edit Observation' : 'Create Observation for:'}</h2>
                             <h3>
-                               {selectedPlant.strain_name} ({selectedHarvestGroup.har_grp})  {/* displays the currently selected plant and harvest group in the form header for context */}
+                               {getCultivarName(selectedPlant)} ({selectedHarvestGroup.har_grp})  {/* displays the currently selected plant and harvest group in the form header for context */}
                             </h3>
                           </div>
                           <div className="form-actions">
@@ -831,6 +1254,25 @@ export default function Observations({ onNavigateTo }) {
                                 placeholder="Operator name"
                               />
                             </label>
+
+                            <label className="form-span-full">
+                              Observation Image
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0] || null;
+                                  setObservationImageFile(file);
+                                }}
+                              />
+                              {(observationImageFile || formState.observ_img) && (
+                                <img
+                                  className="manage-preview-image"
+                                  src={observationImageFile ? observationImagePreviewUrl : resolveImageUrl(formState.observ_img)}
+                                  alt="Observation preview"
+                                />
+                              )}
+                            </label>
                           </div>
 
                           <div className="form-actions">
@@ -852,22 +1294,26 @@ export default function Observations({ onNavigateTo }) {
                         </div>
                       ) : (
                         <div className="observations-timeline">
+
+                        <h1 className ='observation-card-header'>Total Observations: {observations.length}</h1>
+
                           {observations.map(observation => (
                             <article key={observation._id} className="observation-card">
                               <div className="observation-card-header">
                                 <div>
                                   <h2>Plant: {observation.plant_name}</h2>
                                   <h3>Growth Stage: {formatStage(observation.growth_stage)}</h3>
-                                  
                                   <p className="observation-date">Observed: {formatDate(observation.recorded_at)}</p>
                                   {observation.har_grp && (
                                     <p className="observation-date">Group: {observation.har_grp}</p>
                                   )}
-                                  
                                 </div>
+
                                 <div className="observation-card-actions">
-                                  {typeof observation.data_quality === 'number' && (
+                                  {typeof observation.data_quality === 'number' ? (
                                     <span className="quality-badge">Data Quality Score: {observation.data_quality}/10</span>
+                                  ) : (
+                                    <span className="quality-badge">Edit to add data quality</span>
                                   )}
                                   <button type="button" className="ghost-btn small" onClick={() => handleEditObservation(observation)}>
                                     Edit
@@ -883,95 +1329,20 @@ export default function Observations({ onNavigateTo }) {
                                 </div>
                               </div>
 
-                              {(observation.morphology?.height_cm || observation.morphology?.canopy_width_cm || observation.morphology?.leaf_count || observation.morphology?.node_count || observation.morphology?.cola_count) && (
-                                <section className="observation-section">
-                                  <h4>Morphology</h4>
-                                  <div className="observation-grid">
-                                    {typeof observation.morphology?.height_cm === 'number' && <p><strong>Height:</strong> {observation.morphology.height_cm} cm</p>}
-                                    {typeof observation.morphology?.canopy_width_cm === 'number' && <p><strong>Canopy Width:</strong> {observation.morphology.canopy_width_cm} cm</p>}
-                                    {typeof observation.morphology?.leaf_count === 'number' && <p><strong>Leaf Count:</strong> {observation.morphology.leaf_count}</p>}
-                                    {typeof (observation.morphology?.node_count ?? observation.morphology?.cola_count) === 'number' && (
-                                      <p><strong>Node Count:</strong> {observation.morphology.node_count ?? observation.morphology.cola_count}</p>
-                                    )}
-                                  </div>
-                                </section>
-                              )}
-                              {(typeof observation.health?.overall_score === 'number' || observation.health?.stress_type?.length > 0 || observation.health?.symptoms?.length > 0) && (
-                                <section className="observation-section">
-                                  <h4>Health</h4>
-                                  {typeof observation.health?.overall_score === 'number' && (
-                                    <p><strong>Overall Score:</strong> {observation.health.overall_score}/10</p>
-                                  )}
-                                  {observation.health?.stress_type?.length > 0 && (
-                                    <p><strong>Stress Types:</strong> {observation.health.stress_type.join(', ')}</p>
-                                  )}
-                                  {observation.health?.symptoms?.length > 0 && (
-                                    <div className="list-block">
-                                      <strong>Symptoms:</strong>
-                                      {observation.health.symptoms.map((symptom, index) => (
-                                        <p key={`${observation._id}-symptom-${index}`}>
-                                          {symptom.type} at {symptom.location || 'unknown location'}
-                                          {typeof symptom.severity === 'number' ? `, severity ${symptom.severity}/10` : ''}
-                                          {symptom.confirmed_by ? `, confirmed by ${symptom.confirmed_by}` : ''}
-                                        </p>
-                                      ))}
-                                    </div>
-                                  )}
-                                </section>
-                              )}
+                              <ObservationSummary
+                                observation={observation}
+                                selectedHarvestGroup={selectedHarvestGroup}
+                                plants={plants}
+                                groupPlantTotalCount={groupPlantTotalCount}
+                                selectedPlant={selectedPlant}
+                                latestObservation={latestObservation}
+                              />
 
-                              {(typeof observation.environment_snapshot?.temp_c === 'number' || typeof observation.environment_snapshot?.humidity_pct === 'number' || typeof observation.environment_snapshot?.vpd_kpa === 'number' || typeof observation.environment_snapshot?.ppfd_umol === 'number') && (
-                                <section className="observation-section">
-                                  <h4>Environment Snapshot</h4>
-                                  <div className="observation-grid">
-                                    {typeof observation.environment_snapshot?.temp_c === 'number' && <p><strong>Temp:</strong> {observation.environment_snapshot.temp_c} C</p>}
-                                    {typeof observation.environment_snapshot?.humidity_pct === 'number' && <p><strong>Humidity:</strong> {observation.environment_snapshot.humidity_pct}%</p>}
-                                    {typeof observation.environment_snapshot?.vpd_kpa === 'number' && <p><strong>VPD:</strong> {observation.environment_snapshot.vpd_kpa} kPa</p>}
-                                    {typeof observation.environment_snapshot?.ppfd_umol === 'number' && <p><strong>PPFD:</strong> {observation.environment_snapshot.ppfd_umol} umol</p>}
-                                    {typeof observation.environment_snapshot?.co2_ppm === 'number' && <p><strong>CO2:</strong> {observation.environment_snapshot.co2_ppm} ppm</p>}
-                                    {typeof observation.environment_snapshot?.photoperiod_hrs === 'number' && <p><strong>Photoperiod:</strong> {observation.environment_snapshot.photoperiod_hrs} hrs</p>}
-                                  </div>
-                                </section>
-                              )}
+                              <ObservationCardDetails
+                                observation={observation}
+                                resolveImageUrl={resolveImageUrl}
+                              />
 
-                              {observation.media?.length > 0 && (
-                                <section className="observation-section">
-                                  <h4>Media</h4>
-                                  <div className="observation-media-grid">
-                                    {observation.media.map((item, index) => (
-                                      <div key={`${observation._id}-media-${index}`} className="observation-media-item">
-                                        <p className="observation-media-label">
-                                          <strong>{item.type || 'Media'}</strong>
-                                          {item.angle ? ` (${item.angle})` : ''}
-                                        </p>
-                                        {isImageMedia(item) ? (
-                                          <a href={item.url} target="_blank" rel="noopener noreferrer">
-                                            <img
-                                              className="observation-media-image"
-                                              src={item.url}
-                                              alt={`${item.type || 'Media'} ${item.angle || ''}`.trim()}
-                                              loading="lazy"
-                                            />
-                                          </a>
-                                        ) : (
-                                          <a
-                                            className="observation-media-link"
-                                            href={item.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                          >
-                                            {item.url}
-                                          </a>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </section>
-                              )}
-
-                              <p className="observation-footer">
-                                Recorded by {observation.recorded_by || 'unknown'}
-                              </p>
                             </article>
                           ))}
                         </div>
@@ -986,6 +1357,23 @@ export default function Observations({ onNavigateTo }) {
                   <section className="editor-card manage-card">
                     <div className="sidebar-section-header">
                       <h3>Harvest Group Management</h3>
+                      <span className="manage-mode-pill">{isManagingExistingGroup ? 'Edit Mode' : 'Create Mode'}</span>
+                    </div>
+                    <p className="manage-helper-text">
+                      {isManagingExistingGroup
+                        ? `Editing ${selectedHarvestGroup?.har_grp}`
+                        : 'Creating a new harvest group'}
+                    </p>
+                    <div className="inline-actions">
+                      {isManagingExistingGroup ? (
+                        <button type="button" className="ghost-btn small" onClick={startNewHarvestGroup} disabled={groupFormSubmitting}>
+                          Start New Group
+                        </button>
+                      ) : (
+                        <button type="button" className="ghost-btn small" onClick={cancelNewHarvestGroup} disabled={groupFormSubmitting || harvestGroups.length === 0}>
+                          Cancel New Group
+                        </button>
+                      )}
                     </div>
 
                     <form className="data-form" onSubmit={handleCreateHarvestGroup}>
@@ -994,7 +1382,7 @@ export default function Observations({ onNavigateTo }) {
                           Select Group (to edit or delete)
                           <select
                             name="group_id"
-                            value={selectedHarvestGroupId || ''}
+                            value={isManagingExistingGroup ? selectedHarvestGroupId || '' : ''}
                             onChange={handleGroupFormChange}
                           >
                             <option value="">Create New</option>
@@ -1005,7 +1393,7 @@ export default function Observations({ onNavigateTo }) {
                             ))}
                           </select>
                         </label>
-                        {!selectedHarvestGroup && (
+                        {!isManagingExistingGroup && (
                           <label>
                             HG Key (for new group)
                             <input
@@ -1036,16 +1424,34 @@ export default function Observations({ onNavigateTo }) {
                             onChange={(e) => setGroupFormState(current => ({ ...current, notes: e.target.value }))}
                           />
                         </label>
+                        <label className="form-span-full">
+                          Harvest Group Image
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] || null;
+                              setGroupImageFile(file);
+                            }}
+                          />
+                          {(groupImageFile || groupFormState.image_url) && (
+                            <img
+                              className="manage-preview-image"
+                              src={groupImageFile ? groupImagePreviewUrl : resolveImageUrl(groupFormState.image_url)}
+                              alt="Harvest group preview"
+                            />
+                          )}
+                        </label>
                       </div>
                       <div className="form-actions">
                         <button className="primary-btn" type="submit" disabled={groupFormSubmitting}>
-                          {selectedHarvestGroup ? 'Update Group' : 'Create Group'}
+                          {groupFormSubmitting ? 'Saving...' : isManagingExistingGroup ? 'Update Group' : 'Create Group'}
                         </button>
                         <button
                           className="danger-btn"
                           type="button"
                           onClick={handleDeleteHarvestGroup}
-                          disabled={groupFormSubmitting || !selectedHarvestGroup}
+                          disabled={groupFormSubmitting || !isManagingExistingGroup}
                         >
                           Delete Selected
                         </button>
@@ -1056,8 +1462,15 @@ export default function Observations({ onNavigateTo }) {
                   <section className="editor-card manage-card">
                     <div className="sidebar-section-header">
                       <h3>Plants In Group</h3>
-                      <span>{plants.length}</span>
+                      <span>{selectedHarvestGroup ? plants.length : 0}</span>
                     </div>
+                    <p className="manage-helper-text">
+                      {selectedHarvestGroup
+                        ? isManagingExistingPlant
+                          ? `Editing ${getCultivarName(selectedPlant) || 'plant'}`
+                          : `Adding a new plant to ${selectedHarvestGroup.har_grp}`
+                        : 'Select or create a harvest group first'}
+                    </p>
 
                     {selectedHarvestGroup ? (
                       <form className="data-form" onSubmit={handleCreateGroupPlant}>
@@ -1066,38 +1479,37 @@ export default function Observations({ onNavigateTo }) {
                             Select Plant (to edit or delete)
                             <select
                               name="plant_id"
-                              value={selectedPlantId || ''}
+                              value={isManagingExistingPlant ? selectedPlantId || '' : ''}
                               onChange={handleGroupPlantFormChange}
                             >
                               <option value="">Add New</option>
                               {plants.map(plant => (
                                 <option key={plant._id} value={plant._id}>
-                                  {plant.strain_name} ({plant.plant_count} plants)
+                                  {getCultivarName(plant)} ({plant.plant_count} plants)
                                 </option>
                               ))}
                             </select>
                           </label>
-                          {!selectedPlant && (
+                          {isManagingExistingPlant ? (
                             <label>
-                              Strain Name (for new plant)
+                              Cultivar Name
                               <input
                                 type="text"
-                                name="new_strain_name"
-                                value={newStrainName}
-                                onChange={event => setNewStrainName(event.target.value)}
-                                placeholder="Pimp Juice"
+                                name="cultivar_name"
+                                value={groupPlantFormState.cultivar_name}
+                                onChange={handleGroupPlantFormChange}
+                                placeholder="Cultivar name"
                               />
                             </label>
-                          )}
-                          {selectedPlant && (
+                          ) : (
                             <label>
-                              Strain Name
+                              Cultivar Name (for new plant)
                               <input
                                 type="text"
-                                name="strain_name"
-                                value={groupPlantFormState.strain_name}
-                                onChange={handleGroupPlantFormChange}
-                                placeholder="Strain name"
+                                name="new_cultivar_name"
+                                value={newCultivarName}
+                                onChange={event => setNewCultivarName(event.target.value)}
+                                placeholder="Pimp Juice"
                               />
                             </label>
                           )}
@@ -1130,15 +1542,26 @@ export default function Observations({ onNavigateTo }) {
                             />
                           </label>
                         </div>
+                        <div className="inline-actions">
+                          {isManagingExistingPlant ? (
+                            <button type="button" className="ghost-btn small" onClick={startNewPlant} disabled={groupPlantFormSubmitting}>
+                              Add New Plant
+                            </button>
+                          ) : (
+                            <button type="button" className="ghost-btn small" onClick={cancelNewPlant} disabled={groupPlantFormSubmitting || plants.length === 0}>
+                              Cancel New Plant
+                            </button>
+                          )}
+                        </div>
                         <div className="form-actions">
                           <button className="primary-btn" type="submit" disabled={groupPlantFormSubmitting}>
-                            {selectedPlant ? 'Update Plant' : 'Add Plant'}
+                            {groupPlantFormSubmitting ? 'Saving...' : isManagingExistingPlant ? 'Update Plant' : 'Add Plant'}
                           </button>
                           <button
                             className="danger-btn"
                             type="button"
                             onClick={handleDeleteGroupPlant}
-                            disabled={groupPlantFormSubmitting || !selectedPlant}
+                            disabled={groupPlantFormSubmitting || !isManagingExistingPlant}
                           >
                             Delete Selected Plant
                           </button>
@@ -1151,29 +1574,22 @@ export default function Observations({ onNavigateTo }) {
                 </div>
               </>
             )}
-          </>
-        ) : (
-          <div className="observations-empty-state">Create or select a harvest group to begin.</div>
-        )}
+        </>
       </main>
 
-      <div className="observations-right">
-        {selectedHarvestGroup ? (
-          <div className="observations-summary-card">
-            <h3>Observation Summary</h3>
-            <p><strong>Harvest Group:</strong> {selectedHarvestGroup.har_grp}</p>
-            <p><strong>Room:</strong> {selectedHarvestGroup.current_room || 'Unassigned'}</p>
-            <p><strong>Strains In HG:</strong> {plants.length}</p>
-            <p><strong>Plants In HG:</strong> {groupPlantTotalCount}</p>
-            <p><strong>Selected Strain:</strong> {selectedPlant?.strain_name || 'None selected'}</p>
-            <p><strong>Total Records (selected strain):</strong> {observations.length}</p>
-            <p><strong>Latest Stage:</strong> {latestObservation ? formatStage(latestObservation.growth_stage) : 'No data'}</p>
-            <p><strong>Latest Record:</strong> {latestObservation ? formatDate(latestObservation.recorded_at) : 'No data'}</p>
+      {crudPopup.open && (
+        <div className="crud-popup-backdrop">
+          <div className="crud-popup-card">
+            <h3>Operation Successful</h3>
+            <p>{crudPopup.message}</p>
+            <p className="crud-popup-subtext">You are still on Observations.</p>
+            <button className="primary-btn" type="button" onClick={() => setCrudPopup({ open: false, message: '' })}>
+              Continue
+            </button>
           </div>
-        ) : (
-          <div className="observations-empty-state compact">Select a harvest group to see summary.</div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
     </div>
   );
 }
