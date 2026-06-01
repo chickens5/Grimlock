@@ -37,19 +37,19 @@ export default function Home({ onNavigateTo }) {
             className="nav-button"
             onClick={() => onNavigateTo('observations')}
           >
-            Observations
+            Plant Management & Observations
           </button>
           <button
             className="nav-button"
             onClick={() => onNavigateTo('flower-products')}
           >
-            Flower Products
+            Product Inventory
           </button>
           <button 
             className="nav-button"
             onClick={() => onNavigateTo('concentrates')}
           >
-            Vapes & Concentrates
+            Product Inventory 2
           </button>
         </nav>
       </div>
