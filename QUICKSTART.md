@@ -8,38 +8,50 @@
 
 ### 1. Install Dependencies
 ```bash
-#open terminal
 npm install
 ```
 
-### 2. Configure MongoDB
-Create a `.env` file in the root directory:
+### 2. Configure Environment Variables
+Create a `.env` file in the root directory.
 
-You need an MongoDB Atlas user with administrative privileges to utilize all features.
-```
-MONGODB_URI={you can find this on your MongoDB Atlas Cluster URI by hitting the connect button}
+For a local-only setup, this is enough:
+
+```env
+MONGODB_URI=mongodb://localhost:27017/grimlock
 PORT=5000
+
+# Optional local admin gate for write routes.
+# If omitted, local writes stay open for development.
+LOCAL_ADMIN_TOKEN=change-me-local-admin
+
+# Optional observation-specific controls.
+# If omitted, observation reads stay open and writes can fall back to LOCAL_ADMIN_TOKEN.
+OBSERVATION_WRITE_TOKEN=change-me-observation-write
+OBSERVATION_READ_TOKEN=change-me-observation-read
+OBSERVATION_SECURE_READS=false
+
+# Optional browser restriction during local dev.
+CORS_ORIGIN=http://localhost:5173
 ```
+
+If you ever use MongoDB Atlas, create one app user with read/write access to this database only. You do not need a full admin user for normal app use.
+
+If any database credentials were ever stored in code or committed to the repo, rotate them and move them into `.env`.
 
 ## Running the Application
 
 ```bash
-#this runs the frontend and backend server
 npm run dev:all
+```
 
+This starts the frontend and backend together.
 
-#This will start:
-#**Frontend**: http://localhost:XXXX
-#**Backend API**: http://localhost:XXXX
+Alternately, run them separately:
 
-#ALTERNATIVELY
-
-**Terminal 1: Backend Server**
 ```bash
 npm run dev:server
 ```
 
-**Terminal 2: Frontend**
 ```bash
 npm run dev
 ```

@@ -31,7 +31,6 @@ export const getAllPlants = async (req, res, next) => {
     }
 
     const plants = await Plant.find(filter)
-      .populate('concentrates')
       .sort({ created_at: -1 });
     res.json(plants);
   } catch (error) {
@@ -42,8 +41,7 @@ export const getAllPlants = async (req, res, next) => {
 
 export const getPlantById = async (req, res, next) => {
   try {
-    const plant = await Plant.findById(req.params.id)
-      .populate('concentrates');
+    const plant = await Plant.findById(req.params.id);
     if (!plant) return res.status(404).json({ message: 'Plant not found' });
     
     const observations = await Observation.find({ plant_id: plant._id })

@@ -9,8 +9,8 @@ Welcome
 
 I built this full-stack web application while I was working as a Cultivation Technician for Vibe Cannabis.
 
-I orginally planned on deploying this through Heroku for backend management, so I left my position and
-thus this has Full CRUD operations, but should only be deployed locally.
+I orginally planned on deploying this through Heroku for backend management, but I left my position and
+thus this has Full CRUD operations meant for a local enviornment.
 
 Overall, is a great scaffold for plant management and eventually ML features for hydroponics.
 =======
@@ -27,9 +27,8 @@ A full-stack web application for agricultural management or for personal gorw tr
 <img width="1913" height="900" alt="observ3" src="https://github.com/user-attachments/assets/9c98c662-c635-4180-bd5f-50414ee176b3" />
 <img width="1905" height="918" alt="Screenshot 2026-05-31 204126" src="https://github.com/user-attachments/assets/a75e31b3-81f9-4790-8b7e-b69beb7c81b5" />
 
-
-**Current Status**: Frontend homepage with aurora animation + Plant management UI 
-**Currently Implementing**: Data input forms, observation recording, ML features
+**Current Status**: Frontend homepage with aurora animation + plant management UI
+**Currently Implementing**: Data input forms, observation recording, local-only auth guidance, ML-ready structure
 
 
 
@@ -39,3 +38,9 @@ A full-stack web application for agricultural management or for personal gorw tr
 - **Backend**: Express.js + Node.js
 - **Database**: MongoDB
 - **Styling**: CSS3 + WebGL shaders
+
+## Local Security Model
+
+This project is intentionally local-first. Write routes can be gated with `LOCAL_ADMIN_TOKEN`, and observation-specific reads/writes can be tightened with `OBSERVATION_READ_TOKEN` and `OBSERVATION_WRITE_TOKEN`.
+
+For a private deployment, keep the backend on your own machine or another trusted host, store secrets only in `.env`, and use a MongoDB user with access limited to this app database.

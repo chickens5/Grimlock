@@ -1,10 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './Observations.css';
 import { apiUrl } from '../lib/api';
+
+import BlobCursor from '../components/BlobCursor.jsx';
+
 import ObservationCard from './observations/ObservationCard.jsx';
 import ObservationEditorForm from './observations/ObservationEditorForm.jsx';
+
 import HarvestGroupManageForm from './observations/HarvestGroupManageForm.jsx';
 import HarvestGroupPlantForm from './observations/HarvestGroupPlantForm.jsx';
+
 import { STAGE_LABELS, formatDate, formatStage, getCultivarName } from './observations/observationUtils.js';
 
 const EMPTY_GROUP_FORM = {
@@ -819,13 +824,34 @@ export default function Observations({ onNavigateTo }) {
 
   return (
     <div className="observations-page">
+      <BlobCursor
+  blobType="circle"
+  fillColor="#96ff8b"
+  trailCount={2}
+  sizes={[45,125]}
+  innerSizes={[20,35]}
+  innerColor="#bf0000"
+  opacities={[1,0.6]}
+  shadowColor="#ffffff"
+  shadowBlur={10}
+  shadowOffsetX={-5}
+  shadowOffsetY={25}
+  filterStdDeviation={30}
+  useFilter={true}
+  fastDuration={0.01}
+  slowDuration={0.5}
+  zIndex={100}
+  />
       
       <div className="observations-nav-bar">
         <button className="nav-btn" onClick={() => onNavigateTo('home')}>
           ← Home
         </button>
-        
-        <div className="nav-title">Observations</div>
+
+        <div className="nav-title-shell">
+          <span className="nav-title-eyebrow">Field Journal</span>
+          <div className="nav-title">Observations</div>
+        </div>
 
         <button className="nav-btn" onClick={() => onNavigateTo('Plants')}>
           Explore Native Plants →
@@ -843,12 +869,18 @@ export default function Observations({ onNavigateTo }) {
               <div className="hg-highlight-card">
                 <div className="hg-highlight-top">
                   <div className="hg-highlight-content">
-                    <h1>Current Harvest Group: {selectedHarvestGroup.har_grp}</h1>
-                    <h1>Total Plants: {groupPlantTotalCount}</h1>
-                    <h2>Current Room: {selectedHarvestGroup.current_room || 'Unassigned'}</h2>
-                    <div className="selected-plant-meta observations-header-actions">
-                      <i><strong>Latest Record:</strong> {selectedHarvestGroup.latest_recorded_at ? formatDate(selectedHarvestGroup.latest_recorded_at) : 'No data'}</i>
-                      <i><strong>Total Observations:</strong> {selectedHarvestGroup.observations_count || 0}</i>
+                    <p className="hg-kicker">Active Crop Group</p>
+                    <h1>{selectedHarvestGroup.har_grp}</h1>
+                    <p className="hg-subtitle">
+                      {selectedHarvestGroup.current_room || 'Unassigned room'} • {groupPlantTotalCount} tracked plants
+                    </p>
+                    <div className="selected-plant-meta observations-header-actions hg-stat-row">
+                      <span className="hg-stat-pill">
+                        <strong>Latest Record:</strong> {selectedHarvestGroup.latest_recorded_at ? formatDate(selectedHarvestGroup.latest_recorded_at) : 'No data'}
+                      </span>
+                      <span className="hg-stat-pill">
+                        <strong>Total Observations:</strong> {selectedHarvestGroup.observations_count || 0}
+                      </span>
                     </div>
                   </div>
                   {selectedHarvestGroup.image_url && (
@@ -915,6 +947,7 @@ export default function Observations({ onNavigateTo }) {
                         </select>
                       </label>
                     )}
+
                   </div>
 
                   {/* The observation form and timeline are only shown when a plant is selected, 

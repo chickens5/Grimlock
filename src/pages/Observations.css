@@ -45,7 +45,21 @@
   border-radius: 8px;
   background: rgba(30, 30, 50, 0.44);
   backdrop-filter: blur(12px);
-  
+}
+
+.nav-title-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-title-eyebrow {
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #bcdfff;
+  opacity: 0.9;
 }
 
 /*The nav-btns should be more bubbly and */
@@ -415,9 +429,13 @@
 }
 
 .hg-highlight-card {
-  outline: 1.3px solid #e100ff;
-  padding: 12px;
-  border-radius: 8px;
+  border: 1px solid rgba(126, 202, 255, 0.28);
+  padding: 14px;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at top right, rgba(126, 202, 255, 0.16), transparent 38%),
+    linear-gradient(145deg, rgba(23, 31, 45, 0.8), rgba(26, 20, 43, 0.86));
+  box-shadow: 0 16px 36px rgba(7, 11, 20, 0.45);
 }
 
 .hg-highlight-top {
@@ -429,13 +447,45 @@
 
 .hg-highlight-content h1 {
   margin: 0 0 4px 0;
-  font-size: 1.05rem;
-  line-height: 1.25;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
 }
 
 .hg-highlight-content h2 {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.hg-kicker {
+  margin: 0 0 6px 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b6d7f5;
+}
+
+.hg-subtitle {
+  margin: 0;
+  font-size: 0.94rem;
+  color: #d8e6f2;
+}
+
+.hg-stat-row {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.hg-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 202, 255, 0.28);
+  background: rgba(10, 20, 34, 0.44);
+  color: #d8edff;
+  font-size: 0.8rem;
 }
 
 .hg-highlight-image {

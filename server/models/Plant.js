@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import { vibeClusterData } from './Concentrate.js';
 
 const plantSchema = new mongoose.Schema({
   uid: {
@@ -34,16 +33,6 @@ const plantSchema = new mongoose.Schema({
     lineage: [String]
   },
 
-  // VIBE Cluster Classification
-  vibe_cluster: {
-    type: String,
-    enum: ['The Funk', 'The Juice', 'Floral Sweet', 'Summer Haze', 'Exotic', 'unclassified'],
-    default: 'unclassified'
-  },
-
-  // Concentrates derived from this plant
-  concentrates: [mongoose.Schema.Types.ObjectId],
-
   strain_image: String,
 
   // Metadata
@@ -57,7 +46,7 @@ const plantSchema = new mongoose.Schema({
   is_clone: Boolean
 });
 
-// Keep fields in sync for mixed old/new payloads and auto-fill terpene drivers.
+// Keep fields in sync for mixed old/new payloads.
 plantSchema.pre('validate', function syncSchemaFields(next) {
   if (!this.product_name && this.genotype?.strain_name) {
     this.product_name = this.genotype.strain_name;
@@ -69,12 +58,6 @@ plantSchema.pre('validate', function syncSchemaFields(next) {
 
   if ((!this.lineage || this.lineage.length === 0) && this.genotype?.lineage?.length) {
     this.lineage = this.genotype.lineage;
-  }
-
-  const hasTerpene = Array.isArray(this.terpene) && this.terpene.length > 0;
-  const clusterInfo = vibeClusterData[this.vibe_cluster];
-  if (!hasTerpene && clusterInfo?.primary_terpene_drivers?.length) {
-    this.terpene = clusterInfo.primary_terpene_drivers;
   }
 
   next();

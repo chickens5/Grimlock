@@ -5,12 +5,22 @@ import {
   updateObservation,
   deleteObservation
 } from '../controllers/observationController.js';
+import { requireObservationAccess } from '../middleware/observationAccess.js';
+import {
+  validateObservationPayload,
+  validateObservationPlantParam,
+  validateObservationQuery,
+  validateObservationRecordIdParam
+} from '../middleware/observationValidation.js';
 
 const router = express.Router();
 
-router.get('/plant/:plantId', getObservationsByPlant);
-router.post('/', createObservation);
-router.put('/:id', updateObservation);
-router.delete('/:id', deleteObservation);
+router.use(requireObservationAccess);
+
+router.get('/plant/:plantId', validateObservationPlantParam, validateObservationQuery, getObservationsByPlant);
+
+router.post('/', validateObservationPayload, createObservation);
+router.put('/:id', validateObservationRecordIdParam, validateObservationPayload, updateObservation);
+router.delete('/:id', validateObservationRecordIdParam, deleteObservation);
 
 export default router;

@@ -6,7 +6,6 @@ import path from 'path';
 
 import plantRoutes from './routes/plants.js';
 import observationRoutes from './routes/observations.js';
-import concentrateRoutes from './routes/concentrates.js';
 import harvestGroupRoutes from './routes/harvest-groups.js';
 import labResultRoutes from './routes/lab-results.js';
 import mlDatasetRoutes from './routes/ml-datasets.js';
@@ -15,6 +14,7 @@ import uploadsRoutes from './routes/uploads.js';
 dotenv.config();
 
 const app = express();
+app.disable('x-powered-by');
 
 // Middleware
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
@@ -32,6 +32,13 @@ app.use(cors({
     callback(new Error('Not allowed by CORS'));
   }
 }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+  next();
+});
 app.use(express.json());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
@@ -47,7 +54,6 @@ mongoose.connect(mongoUri)
 // Routes
 app.use('/api/plants', plantRoutes);
 app.use('/api/observations', observationRoutes);
-app.use('/api/concentrates', concentrateRoutes);
 app.use('/api/harvest-groups', harvestGroupRoutes);
 app.use('/api/lab-results', labResultRoutes);
 app.use('/api/ml-datasets', mlDatasetRoutes);

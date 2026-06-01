@@ -6,8 +6,11 @@ import {
   updatePlant,
   deletePlant
 } from '../controllers/plantController.js';
+import { requireWriteAccess } from '../middleware/requireWriteAccess.js';
 
 const router = express.Router();
+
+router.use(requireWriteAccess);
 
 router.get('/', getAllPlants);
 router.get('/:id', getPlantById);

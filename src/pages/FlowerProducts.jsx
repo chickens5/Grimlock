@@ -45,8 +45,8 @@ export default function FlowerProducts({ onNavigateTo }) {
           <button className="nav-btn" onClick={() => onNavigateTo('plants')}>
             ← Native Plants
           </button>
-          <button className="nav-btn" onClick={() => onNavigateTo('concentrates')}>
-            Vapes →
+          <button className="nav-btn" onClick={() => onNavigateTo('ml-insights')}>
+            ML Insights →
           </button>
         </div>
       </div>

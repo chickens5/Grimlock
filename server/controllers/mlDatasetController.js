@@ -128,10 +128,9 @@ function getScoreWeights(queryWeights) {
   };
 }
 
-async function buildCultivarRows({ strainStatus, vibeCluster }) {
+async function buildCultivarRows({ strainStatus }) {
   const plantFilter = {};
   if (strainStatus) plantFilter.strain_status = strainStatus;
-  if (vibeCluster) plantFilter.vibe_cluster = vibeCluster;
 
   const [plants, observations, labResults] = await Promise.all([
     Plant.find(plantFilter).lean(),
@@ -171,7 +170,7 @@ async function buildCultivarRows({ strainStatus, vibeCluster }) {
       uid: plant.uid,
       product_name: plant.product_name || plant.genotype?.strain_name || plant.uid,
       strain_status: plant.strain_status || 'Unknown',
-      vibe_cluster: plant.vibe_cluster || 'unclassified',
+      cultivar_segment: plant.strain_status || 'Unknown',
       observation_ids: plantObservations.map(obs => obs._id).filter(Boolean),
       feature_vector: {
         lineage_parent_count: lineage.parentCount,
@@ -331,8 +330,7 @@ export const generateMLDataset = async (req, res) => {
 
     const scoreWeights = getScoreWeights(req.body.score_weights || {});
     const rows = await buildCultivarRows({
-      strainStatus: query_filter?.strain_status,
-      vibeCluster: query_filter?.vibe_cluster
+      strainStatus: query_filter?.strain_status
     });
     const scoredRows = scoreCultivarRows(rows, scoreWeights);
 
@@ -379,8 +377,7 @@ export const getCultivarRankings = async (req, res, next) => {
     });
 
     const rows = await buildCultivarRows({
-      strainStatus: req.query.strain_status,
-      vibeCluster: req.query.vibe_cluster
+      strainStatus: req.query.strain_status
     });
     const scoredRows = scoreCultivarRows(rows, scoreWeights);
 

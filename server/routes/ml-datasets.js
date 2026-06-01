@@ -7,8 +7,11 @@ import {
   generateMLDataset,
   getCultivarRankings
 } from '../controllers/mlDatasetController.js';
+import { requireWriteAccess } from '../middleware/requireWriteAccess.js';
 
 const router = express.Router();
+
+router.use(requireWriteAccess);
 
 router.get('/', getAllMLDatasets);
 router.get('/cultivar-rankings', getCultivarRankings);

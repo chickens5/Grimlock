@@ -7,7 +7,7 @@ import PlantCard from './eden-tool/PlantCard';
 import PlantModal from './eden-tool/PlantModal';
 
 import './Plants.css';
-import './PlantsBG.css';
+
 
 const ALL_PLANTS = normalizePlants(rawPlants);
 

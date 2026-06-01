@@ -24,6 +24,7 @@ function normalizeObservationPayload(payload) {
 
 export const getObservationsByPlant = async (req, res, next) => {
   try {
+    const limit = Math.max(1, Math.min(Number(req.query.limit) || 120, 500));
     const filter = {
       $or: [
         { hg_plant_id: req.params.plantId },
@@ -35,7 +36,9 @@ export const getObservationsByPlant = async (req, res, next) => {
     }
 
     const observations = await Observation.find(filter)
-      .sort({ recorded_at: -1 });
+      .sort({ recorded_at: -1 })
+      .limit(limit)
+      .lean();
     res.json(observations);
   } catch (error) {
     console.error('Error fetching observations:', error);
@@ -45,7 +48,7 @@ export const getObservationsByPlant = async (req, res, next) => {
 
 export const createObservation = async (req, res, next) => {
   try {
-    const payload = normalizeObservationPayload({ ...req.body });
+    const payload = normalizeObservationPayload({ ...(req.validatedObservationPayload || req.body) });
     const observation = new Observation(payload);
     const savedObservation = await observation.save();
     res.status(201).json(savedObservation);
@@ -57,7 +60,7 @@ export const createObservation = async (req, res, next) => {
 
 export const updateObservation = async (req, res, next) => {
   try {
-    const payload = normalizeObservationPayload({ ...req.body });
+    const payload = normalizeObservationPayload({ ...(req.validatedObservationPayload || req.body) });
     const observation = await Observation.findByIdAndUpdate(
       req.params.id,
       payload,

@@ -41,15 +41,9 @@ export default function Home({ onNavigateTo }) {
           </button>
           <button
             className="nav-button"
-            onClick={() => onNavigateTo('flower-products')}
+            onClick={() => onNavigateTo('ml-page')}
           >
-            Product Inventory
-          </button>
-          <button 
-            className="nav-button"
-            onClick={() => onNavigateTo('concentrates')}
-          >
-            Product Inventory 2
+            ML Workspace
           </button>
         </nav>
       </div>

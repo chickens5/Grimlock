@@ -9,8 +9,11 @@ import {
   updatePlantInHarvestGroup,
   deletePlantFromHarvestGroup
 } from '../controllers/harvestGroupController.js';
+import { requireWriteAccess } from '../middleware/requireWriteAccess.js';
 
 const router = express.Router();
+
+router.use(requireWriteAccess);
 
 router.get('/', getHarvestGroups);
 router.post('/', createHarvestGroup);
