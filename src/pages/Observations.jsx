@@ -42,6 +42,14 @@ const EMPTY_OBSERVATION_FORM = {
   recorded_by: ''
 };
 
+const DB_SETUP_STEPS = [
+  'Create a MongoDB Atlas cluster, or point MONGODB_URI at your own MongoDB instance.',
+  'Create a database user with read/write access to the Grimlock database.',
+  'Create a root .env file with MONGODB_URI and PORT.',
+  'Optionally add LOCAL_ADMIN_TOKEN and OBSERVATION_WRITE_TOKEN for local write protection.',
+  'Start the backend with npm run dev:server, or run the full app with npm run dev:all.'
+];
+
 function toOptionalNumber(value) {
   if (value === '' || value == null) return undefined;
   const parsed = Number(value);
@@ -150,6 +158,7 @@ export default function Observations({ onNavigateTo }) {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [crudPopup, setCrudPopup] = useState({ open: false, message: '' });
+  const [dbSetupPopupOpen, setDbSetupPopupOpen] = useState(false);
 
   const selectedHarvestGroup = useMemo(
     () => harvestGroups.find(group => group._id === selectedHarvestGroupId) || null,
@@ -268,6 +277,7 @@ export default function Observations({ onNavigateTo }) {
         await loadHarvestGroups({});
       } catch (err) {
         setError(err.message);
+        setDbSetupPopupOpen(true);
       } finally {
         setHarvestLoading(false);
       }
@@ -814,12 +824,72 @@ export default function Observations({ onNavigateTo }) {
   const latestObservation = observations.length > 0 ? observations[0] : null;
   const groupPlantTotalCount = plants.reduce((total, plant) => total + (Number(plant.plant_count) || 0), 0);
 
+  const handleRetryDbConnection = async () => {
+    setHarvestLoading(true);
+    setError(null);
+
+    try {
+      await loadHarvestGroups({});
+      setDbSetupPopupOpen(false);
+    } catch (err) {
+      setError(err.message);
+      setDbSetupPopupOpen(true);
+    } finally {
+      setHarvestLoading(false);
+    }
+  };
+
   if (harvestLoading) {
     return <div className="observations-empty-state">Loading observation dashboard...</div>;
   }
 
   if (error && harvestGroups.length === 0) {
-    return <div className="observations-empty-state error">Error: {error}</div>;
+    return (
+      <div className="observations-empty-state error observations-setup-state">
+        <div className="observations-setup-copy">
+          <h2>Observation API setup required</h2>
+          <p>{error}</p>
+        </div>
+        <div className="observations-setup-actions">
+          <button className="primary-btn" type="button" onClick={() => setDbSetupPopupOpen(true)}>
+            Show Atlas + .env setup
+          </button>
+          <button className="ghost-btn" type="button" onClick={handleRetryDbConnection}>
+            Retry connection
+          </button>
+        </div>
+
+        {dbSetupPopupOpen && (
+          <div className="crud-popup-backdrop">
+            <div className="crud-popup-card setup-popup-card">
+              <h3>How to connect Observations</h3>
+              <p>
+                This workspace loads live harvest groups and observations from your API. The data will populate
+                automatically once the backend can connect to MongoDB and your root <code>.env</code> is configured.
+              </p>
+              <ol className="setup-step-list">
+                {DB_SETUP_STEPS.map(step => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <div className="setup-env-block">
+                <p className="crud-popup-subtext">Example .env</p>
+                <pre>{`MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>/grimlock\nPORT=5000\nLOCAL_ADMIN_TOKEN=change-me-local-admin\nOBSERVATION_WRITE_TOKEN=change-me-observation-write\nOBSERVATION_SECURE_READS=false`}</pre>
+              </div>
+              <p className="crud-popup-subtext">Current error: {error}</p>
+              <div className="observations-setup-actions">
+                <button className="primary-btn" type="button" onClick={handleRetryDbConnection}>
+                  Retry connection
+                </button>
+                <button className="ghost-btn" type="button" onClick={() => setDbSetupPopupOpen(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (

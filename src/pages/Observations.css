@@ -660,6 +660,34 @@
   border-radius: 12px;
 }
 
+.observations-setup-state {
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+}
+
+.observations-setup-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.observations-setup-copy h2,
+.observations-setup-copy p {
+  margin: 0;
+}
+
+.observations-setup-copy p {
+  max-width: 760px;
+}
+
+.observations-setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
 .error,
 .notice {
   padding: 15px;
@@ -899,6 +927,34 @@
 
 .crud-popup-subtext {
   color: #a9ccff;
+}
+
+.setup-popup-card {
+  min-height: 0;
+}
+
+.setup-step-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #d9d3f4;
+  display: grid;
+  gap: 10px;
+}
+
+.setup-env-block {
+  border: 1px solid rgba(126, 202, 255, 0.25);
+  border-radius: 12px;
+  background: rgba(9, 14, 28, 0.78);
+  padding: 14px;
+}
+
+.setup-env-block pre {
+  margin: 0;
+  color: #dff6ff;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 @media (max-width: 1450px) {
