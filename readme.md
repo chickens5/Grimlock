@@ -8,18 +8,11 @@ Welcome
 <img width="1919" height="908" alt="Screenshot 2026-05-31 204029" src="https://github.com/user-attachments/assets/6874c28b-8a67-418e-8aa7-feab6df4dd10" />
 
 
-
-<<<<<<< HEAD
 I orginally planned on deploying this through Heroku for backend management, but I left my position and
 thus this has Full CRUD operations meant for a local enviornment.
-=======
-I orginally planned on deploying this through Heroku for backend management, but I left my position and decided to make this a local deployment.
-
-The codebase has full CRUD operations, but needs more secure user state management. 
-Thus, this should be deployed locally.
->>>>>>> 892b9d6f2a2f96c27af354d957a79b77da986a06
 
 Overall, is a great scaffold for plant management and eventually ML features for hydroponics.
+
 =======
 # Grimlock - Plant Research & JSX Art
 
@@ -50,4 +43,4 @@ A full-stack web application for agricultural management or for personal gorw tr
 
 This project is intentionally local-first. Write routes can be gated with `LOCAL_ADMIN_TOKEN`, and observation-specific reads/writes can be tightened with `OBSERVATION_READ_TOKEN` and `OBSERVATION_WRITE_TOKEN`.
 
-For a private deployment, keep the backend on your own machine or another trusted host, store secrets only in `.env`, and use a MongoDB user with access limited to this app database.
+For a private deployment, keep the backend on your own machine or another trusted host `.env`, and use a MongoDB user with access limited to this app database.
