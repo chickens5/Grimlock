@@ -45,48 +45,4 @@ A full-stack web application for agricultural management or for personal gorw tr
   <img width="1919" height="908" alt="Screenshot 2026-05-31 204029" src="https://github.com/user-attachments/assets/3a0116b4-80c9-4ba4-b989-ad999bf4f2fc" />
 
 
-## Project Structure
 
-```
-Grimlock/
-├── index.jsx                 # Main app entry
-├── index.html               # HTML template
-├── vite.config.js          # Vite configuration
-├── .env                    # Environment variables (local enviornment unless you decide to host APIs elsewhere)
-├── src/
-│   ├── pages/
-│   │   ├── Home.jsx        # Homepage with aurora background
-│   │   ├── Home.css
-│   │   ├── Plants.jsx      # Plant list and grow condition/research database page  
-│   │   ├── Plants.css
-│   │   ├── Concentrates.jsx # Vape & concentrates database page (IP)
-│   │   └── Concentrates.css
-│   └── components/
-│       ├── SoftAurora.jsx   # WebGL aurora animation
-│       └── SoftAurora.css
-├── server/
-│   ├── server.js           # Express server entry
-│   ├── models/
-│   │   ├── Plant.js
-│   │   ├── Concentrate.js
-│   │   ├── Observation.js #defines the models for our db
-│   │   ├── GrowCycle.js
-│   │   ├── LabResult.js
-│   │   └── MLDataset.js
-│   ├── routes/
-│   │   ├── plants.js
-│   │   ├── observations.js
-│   │   └── concentrates.js
-│   ├── controllers/
-│   │   ├── plantController.js
-│   │   ├── observationController.js
-│   │   └── concentrateController.js
-│   └── seed.js             # Sample data generator
-└── package.json            # Dependencies & scripts
-```
-
-## Setup Instructions
-
-### Prerequisites
-- Node.js 16+
-- MongoDB 6+ locally **or** a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster
