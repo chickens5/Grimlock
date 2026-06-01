@@ -14,7 +14,7 @@ thus this has Full CRUD operations meant for a local enviornment.
 Overall, is a great scaffold for plant management and eventually ML features for hydroponics.
 
 =======
-# Grimlock - Plant Research & JSX Art
+# Grimlock - Indoor Agriculture Management
 
 A full-stack web application for agricultural management or for personal gorw tracking with ML-ready data architecture.
 
