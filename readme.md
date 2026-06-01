@@ -1,4 +1,6 @@
 # Grimlock 
+
+##This project was made when I was working fulltime at a cannabis cultivation facility while pursuing my degree full time
   # - A Medium Scale Agriculture Management app that was built around Cannabis Cultivation
 
 Welcome
@@ -37,12 +39,3 @@ A full-stack web application for agricultural management or for personal gorw tr
 - **Backend**: Express.js + Node.js
 - **Database**: MongoDB
 - **Styling**: CSS3 + WebGL shaders
-
-
-
-
-##This project was made when I was working fulltime at a cannabis cultivation facility while pursuing my degree full time
-  <img width="1919" height="908" alt="Screenshot 2026-05-31 204029" src="https://github.com/user-attachments/assets/3a0116b4-80c9-4ba4-b989-ad999bf4f2fc" />
-
-
-
