@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './Observations.css';
 import { apiUrl } from '../lib/api';
 
@@ -9,22 +9,13 @@ import ObservationEditorForm from './observations/ObservationEditorForm.jsx';
 
 import HarvestGroupManageForm from './observations/HarvestGroupManageForm.jsx';
 import HarvestGroupPlantForm from './observations/HarvestGroupPlantForm.jsx';
+import DatabaseSetupPopup from './observations/DatabaseSetupPopup.jsx';
+import { useObservationsData } from './observations/useObservationsData.js';
+import { useObservationCrud } from './observations/useObservationCrud.js';
+import { useHarvestGroupCrud, mapHarvestGroupToForm, EMPTY_GROUP_FORM } from './observations/useHarvestGroupCrud.js';
+import { useHarvestGroupPlantCrud, mapHarvestPlantToForm, EMPTY_GROUP_PLANT_FORM } from './observations/useHarvestGroupPlantCrud.js';
 
 import { STAGE_LABELS, formatDate, formatStage, getCultivarName } from './observations/observationUtils.js';
-
-const EMPTY_GROUP_FORM = {
-  har_grp: '',
-  current_room: '',
-  notes: '',
-  image_url: ''
-};
-
-const EMPTY_GROUP_PLANT_FORM = {
-  cultivar_name: '',
-  plant_count: 1,
-  current_room: '',
-  notes: ''
-};
 
 const EMPTY_OBSERVATION_FORM = {
   recorded_at: '',
@@ -42,26 +33,10 @@ const EMPTY_OBSERVATION_FORM = {
   recorded_by: ''
 };
 
-const DB_SETUP_STEPS = [
-  'Create a MongoDB Atlas cluster, or point MONGODB_URI at your own MongoDB instance.',
-  'Create a database user with read/write access to the Grimlock database.',
-  'Create a root .env file with MONGODB_URI and PORT.',
-  'Optionally add LOCAL_ADMIN_TOKEN and OBSERVATION_WRITE_TOKEN for local write protection.',
-  'Start the backend with npm run dev:server, or run the full app with npm run dev:all.'
-];
-
 function toOptionalNumber(value) {
   if (value === '' || value == null) return undefined;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? undefined : parsed;
-}
-
-function toDateTimeInputValue(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const localOffsetMs = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - localOffsetMs).toISOString().slice(0, 16);
 }
 
 function buildObservationPayload(formState, selectedHarvestGroup, selectedPlant) {
@@ -92,85 +67,54 @@ function buildObservationPayload(formState, selectedHarvestGroup, selectedPlant)
   };
 }
 
-function mapObservationToForm(observation) {
-  return {
-    recorded_at: toDateTimeInputValue(observation.recorded_at),
-    growth_stage: observation.growth_stage || 'vegetative',
-    node_count: observation.morphology?.node_count ?? observation.morphology?.cola_count ?? '',
-    height_cm: observation.morphology?.height_cm ?? '',
-    canopy_width_cm: observation.morphology?.canopy_width_cm ?? '',
-    leaf_count: observation.morphology?.leaf_count ?? '',
-    overall_score: observation.health?.overall_score ?? '',
-    temp_c: observation.environment_snapshot?.temp_c ?? '',
-    humidity_pct: observation.environment_snapshot?.humidity_pct ?? '',
-    vpd_kpa: observation.environment_snapshot?.vpd_kpa ?? '',
-    observ_img: observation.observ_img ?? '',
-    data_quality: observation.data_quality ?? '',
-    recorded_by: observation.recorded_by ?? ''
-  };
-}
-
-function mapHarvestGroupToForm(group) {
-  if (!group) return EMPTY_GROUP_FORM;
-  return {
-    har_grp: group.har_grp || '',
-    current_room: group.current_room || '',
-    notes: group.notes || '',
-    image_url: group.image_url || ''
-  };
-}
-
-function mapHarvestPlantToForm(plant) {
-  if (!plant) return EMPTY_GROUP_PLANT_FORM;
-  return {
-    cultivar_name: getCultivarName(plant),
-    plant_count: plant.plant_count || 1,
-    current_room: plant.current_room || '',
-    notes: plant.notes || ''
-  };
-}
-
 export default function Observations({ onNavigateTo }) {
-  const [harvestGroups, setHarvestGroups] = useState([]);
-  const [selectedHarvestGroupId, setSelectedHarvestGroupId] = useState(null);
-  const [selectedPlantId, setSelectedPlantId] = useState(null);
-  const [groupManageMode, setGroupManageMode] = useState('edit'); // 'create' | 'edit'
-  const [plantManageMode, setPlantManageMode] = useState('edit'); // 'create' | 'edit'
+  const {
+    harvestGroups,
+    selectedHarvestGroupId,
+    selectedPlantId,
+    observations,
+    harvestLoading,
+    observationsLoading,
+    error,
+    dbSetupPopupOpen,
+    selectedHarvestGroup,
+    plants,
+    selectedPlant,
+    setSelectedHarvestGroupId,
+    setSelectedPlantId,
+    setObservations,
+    setError,
+    setDbSetupPopupOpen,
+    refreshCurrentData,
+    refreshSelectionAndObservations,
+    handleRetryDbConnection
+  } = useObservationsData();
 
-  const [groupFormState, setGroupFormState] = useState(EMPTY_GROUP_FORM);
-  const [newHarvestGroupKey, setNewHarvestGroupKey] = useState('');
-  const [groupFormSubmitting, setGroupFormSubmitting] = useState(false);
-  const [groupPlantFormState, setGroupPlantFormState] = useState(EMPTY_GROUP_PLANT_FORM);
-  const [newCultivarName, setNewCultivarName] = useState('');
-  const [groupPlantFormSubmitting, setGroupPlantFormSubmitting] = useState(false);
-  const [groupImageFile, setGroupImageFile] = useState(null);
-  const [observationImageFile, setObservationImageFile] = useState(null);
-  const [groupImagePreviewUrl, setGroupImagePreviewUrl] = useState('');
-  const [observationImagePreviewUrl, setObservationImagePreviewUrl] = useState('');
+  // CRUD hooks for form state management
+  const observationCrud = useObservationCrud(
+    buildObservationPayload,
+    (msg) => setNotice(msg) && setCrudPopup({ open: true, message: msg }),
+    (err) => setError(err)
+  );
 
-  const [observations, setObservations] = useState([]);
-  const [harvestLoading, setHarvestLoading] = useState(true);
-  const [observationsLoading, setObservationsLoading] = useState(false);
-  const [formSubmitting, setFormSubmitting] = useState(false);
-  const [editingObservationId, setEditingObservationId] = useState(null);
-  const [formState, setFormState] = useState(EMPTY_OBSERVATION_FORM);
+  const harvestGroupCrud = useHarvestGroupCrud(
+    getCultivarName,
+    (msg) => setNotice(msg) && setCrudPopup({ open: true, message: msg }),
+    (err) => setError(err),
+    refreshCurrentData,
+    refreshSelectionAndObservations
+  );
+
+  const harvestGroupPlantCrud = useHarvestGroupPlantCrud(
+    getCultivarName,
+    (msg) => setNotice(msg) && setCrudPopup({ open: true, message: msg }),
+    (err) => setError(err),
+    refreshCurrentData
+  );
+
   const [viewMode, setViewMode] = useState('observations'); // 'observations' or 'manage'
-  const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [crudPopup, setCrudPopup] = useState({ open: false, message: '' });
-  const [dbSetupPopupOpen, setDbSetupPopupOpen] = useState(false);
-
-  const selectedHarvestGroup = useMemo(
-    () => harvestGroups.find(group => group._id === selectedHarvestGroupId) || null,
-    [harvestGroups, selectedHarvestGroupId]
-  );
-
-  const plants = selectedHarvestGroup?.plants || [];
-
-  const selectedPlant = useMemo(
-    () => plants.find(plant => String(plant._id) === String(selectedPlantId)) || null,
-    [plants, selectedPlantId]
-  );
 
   const resolveImageUrl = (url) => {
     if (!url) return '';
@@ -190,113 +134,19 @@ export default function Observations({ onNavigateTo }) {
     setCrudPopup({ open: true, message });
   };
 
-  const uploadImageFile = async (file, category) => {
-    const formData = new FormData();
-    formData.append('image', file);
-
-    const response = await fetch(apiUrl(`/api/uploads/image?category=${encodeURIComponent(category)}`), {
-      method: 'POST',
-      body: formData
-    });
-
-    const payload = await response.json().catch(() => null);
-    if (!response.ok || !payload?.url) {
-      throw new Error(payload?.message || 'Image upload failed');
-    }
-
-    return payload.url;
-  };
-
-  const requestJson = async (path, options = {}, fallbackMessage = 'Request failed') => {
-    const response = await fetch(apiUrl(path), options);
-    const contentType = response.headers.get('content-type') || '';
-    const payload = contentType.includes('application/json')
-      ? await response.json().catch(() => null)
-      : null;
-
-    if (!response.ok) {
-      throw new Error(payload?.message || fallbackMessage);
-    }
-
-    return payload;
-  };
-
-  const loadObservationsForSelection = async (plantId, harGrp) => {
-    const params = new URLSearchParams({ har_grp: harGrp });
-    const data = await requestJson(
-      `/api/observations/plant/${plantId}?${params.toString()}`,
-      {},
-      'Failed to fetch observations'
-    );
-    setObservations(Array.isArray(data) ? data : []);
-  };
-
-  const loadHarvestGroups = async ({ preferredGroupId, preferredPlantId } = {}) => {
-    const data = await requestJson('/api/harvest-groups', {}, 'Failed to fetch harvest groups');
-    const groups = Array.isArray(data) ? data : [];
-    setHarvestGroups(groups);
-
-    const resolvedGroup =
-      groups.find(group => group._id === preferredGroupId) ||
-      groups.find(group => group._id === selectedHarvestGroupId) ||
-      groups[0] ||
-      null;
-
-    const nextGroupId = resolvedGroup?._id || null;
-    setSelectedHarvestGroupId(nextGroupId);
-
-    if (!resolvedGroup) {
-      setSelectedPlantId(null);
-      return {
-        groups,
-        resolvedGroup: null,
-        resolvedPlant: null
-      };
-    }
-
-    const groupPlants = resolvedGroup.plants || [];
-    const resolvedPlant =
-      groupPlants.find(plant => String(plant._id) === String(preferredPlantId)) ||
-      groupPlants.find(plant => String(plant._id) === String(selectedPlantId)) ||
-      groupPlants[0] ||
-      null;
-
-    setSelectedPlantId(resolvedPlant?._id || null);
-
-    return {
-      groups,
-      resolvedGroup,
-      resolvedPlant
-    };
-  };
-
+  // Update harvest group form when selectedHarvestGroup changes
   useEffect(() => {
-    const init = async () => {
-      try {
-        setError(null);
-        await loadHarvestGroups({});
-      } catch (err) {
-        setError(err.message);
-        setDbSetupPopupOpen(true);
-      } finally {
-        setHarvestLoading(false);
-      }
-    };
+    if (harvestGroupCrud.groupManageMode !== 'edit') return;
+    harvestGroupCrud.setGroupFormState(mapHarvestGroupToForm(selectedHarvestGroup));
+    harvestGroupCrud.setGroupImageFile(null);
+  }, [selectedHarvestGroup, harvestGroupCrud.groupManageMode]);
 
-    init();
-  }, []);
-
+  // Update plant form when selectedPlant changes
   useEffect(() => {
-    if (groupManageMode !== 'edit') return;
-    setGroupFormState(mapHarvestGroupToForm(selectedHarvestGroup));
-    setGroupImageFile(null);
-  }, [selectedHarvestGroup, groupManageMode]);
-
-  useEffect(() => {
-    if (plantManageMode !== 'edit') return;
-    setGroupPlantFormState(mapHarvestPlantToForm(selectedPlant));
-    setNewCultivarName('');
-  }, [selectedPlant, plantManageMode]);
+    if (harvestGroupPlantCrud.plantManageMode !== 'edit') return;
+    harvestGroupPlantCrud.setGroupPlantFormState(mapHarvestPlantToForm(selectedPlant, getCultivarName));
+    harvestGroupPlantCrud.setNewCultivarName('');
+  }, [selectedPlant, harvestGroupPlantCrud.plantManageMode]);
 
   useEffect(() => {
     if (!crudPopup.open) return undefined;
@@ -308,104 +158,59 @@ export default function Observations({ onNavigateTo }) {
     return () => window.clearTimeout(timeoutId);
   }, [crudPopup]);
 
+  // Update group image preview URL
   useEffect(() => {
-    if (!groupImageFile) {
-      setGroupImagePreviewUrl('');
+    if (!harvestGroupCrud.groupImageFile) {
+      harvestGroupCrud.setGroupImagePreviewUrl('');
       return undefined;
     }
 
-    const nextUrl = URL.createObjectURL(groupImageFile);
-    setGroupImagePreviewUrl(nextUrl);
+    const nextUrl = URL.createObjectURL(harvestGroupCrud.groupImageFile);
+    harvestGroupCrud.setGroupImagePreviewUrl(nextUrl);
     return () => URL.revokeObjectURL(nextUrl);
-  }, [groupImageFile]);
+  }, [harvestGroupCrud.groupImageFile]);
 
+  // Update observation image preview URL
   useEffect(() => {
-    if (!observationImageFile) {
-      setObservationImagePreviewUrl('');
+    if (!observationCrud.observationImageFile) {
+      observationCrud.setObservationImagePreviewUrl('');
       return undefined;
     }
 
-    const nextUrl = URL.createObjectURL(observationImageFile);
-    setObservationImagePreviewUrl(nextUrl);
+    const nextUrl = URL.createObjectURL(observationCrud.observationImageFile);
+    observationCrud.setObservationImagePreviewUrl(nextUrl);
     return () => URL.revokeObjectURL(nextUrl);
-  }, [observationImageFile]);
+  }, [observationCrud.observationImageFile]);
 
+  // Clear observation form when plant/group selection changes
   useEffect(() => {
     if (!selectedPlantId || !selectedHarvestGroup) {
-      setObservations([]);
-      setEditingObservationId(null);
-      setFormState(EMPTY_OBSERVATION_FORM);
-      return;
+      observationCrud.resetForm();
     }
+  }, [selectedPlantId, selectedHarvestGroup, observationCrud]);
 
-    const fetchObservations = async () => {
-      setObservationsLoading(true);
-      setError(null);
-
-      try {
-        await loadObservationsForSelection(selectedPlantId, selectedHarvestGroup.har_grp);
-      } catch (err) {
-        setError(err.message);
-        setObservations([]);
-      } finally {
-        setObservationsLoading(false);
-      }
-    };
-
-    fetchObservations();
-  }, [selectedPlantId, selectedHarvestGroup]);
-
-  const refreshCurrentData = async ({ preferredGroupId, preferredPlantId } = {}) => {
-    return loadHarvestGroups({ preferredGroupId, preferredPlantId });
-  };
-
-  const refreshSelectionAndObservations = async ({ preferredGroupId, preferredPlantId } = {}) => {
-    const data = await refreshCurrentData({ preferredGroupId, preferredPlantId });
-    const nextGroup = data?.resolvedGroup;
-    const nextPlant = data?.resolvedPlant;
-
-    if (nextGroup?.har_grp && nextPlant?._id) {
-      await loadObservationsForSelection(nextPlant._id, nextGroup.har_grp);
-    } else {
-      setObservations([]);
-    }
-
-    return data;
-  };
-
-  const resetForm = () => {
-    setEditingObservationId(null);
-    setFormState(EMPTY_OBSERVATION_FORM);
-    setObservationImageFile(null);
-  };
-
-  const handleEditObservation = (observation) => {
-    setEditingObservationId(observation._id);
-    setFormState(mapObservationToForm(observation));
-  };
-
-  const isManagingExistingGroup = groupManageMode === 'edit' && Boolean(selectedHarvestGroup);
-  const isManagingExistingPlant = plantManageMode === 'edit' && Boolean(selectedPlant);
+  const isManagingExistingGroup = harvestGroupCrud.groupManageMode === 'edit' && Boolean(selectedHarvestGroup);
+  const isManagingExistingPlant = harvestGroupPlantCrud.plantManageMode === 'edit' && Boolean(selectedPlant);
 
   const startNewHarvestGroup = () => {
     clearMessages();
-    setGroupManageMode('create');
-    setPlantManageMode('create');
+    harvestGroupCrud.setGroupManageMode('create');
+    harvestGroupPlantCrud.setPlantManageMode('create');
     setSelectedHarvestGroupId(null);
     setSelectedPlantId(null);
-    setGroupFormState(EMPTY_GROUP_FORM);
-    setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
-    setNewHarvestGroupKey('');
-    setNewCultivarName('');
-    setGroupImageFile(null);
+    harvestGroupCrud.setGroupFormState(EMPTY_GROUP_FORM);
+    harvestGroupPlantCrud.setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
+    harvestGroupCrud.setNewHarvestGroupKey('');
+    harvestGroupPlantCrud.setNewCultivarName('');
+    harvestGroupCrud.setGroupImageFile(null);
   };
 
   const startNewPlant = () => {
     clearMessages();
-    setPlantManageMode('create');
+    harvestGroupPlantCrud.setPlantManageMode('create');
     setSelectedPlantId(null);
-    setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
-    setNewCultivarName('');
+    harvestGroupPlantCrud.setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
+    harvestGroupPlantCrud.setNewCultivarName('');
   };
 
   const selectGroupById = (groupId) => {
@@ -416,31 +221,31 @@ export default function Observations({ onNavigateTo }) {
     }
 
     clearMessages();
-    setGroupManageMode('edit');
+    harvestGroupCrud.setGroupManageMode('edit');
     setSelectedHarvestGroupId(group._id);
-    setGroupFormState(mapHarvestGroupToForm(group));
-    setNewHarvestGroupKey('');
+    harvestGroupCrud.setGroupFormState(mapHarvestGroupToForm(group));
+    harvestGroupCrud.setNewHarvestGroupKey('');
 
     const nextPlant = (group.plants || []).find(item => String(item._id) === String(selectedPlantId)) || (group.plants || [])[0] || null;
     if (!nextPlant) {
       setSelectedPlantId(null);
-      setPlantManageMode('create');
-      setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
-      setNewCultivarName('');
+      harvestGroupPlantCrud.setPlantManageMode('create');
+      harvestGroupPlantCrud.setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
+      harvestGroupPlantCrud.setNewCultivarName('');
       return;
     }
 
     setSelectedPlantId(nextPlant._id);
-    setPlantManageMode('edit');
-    setGroupPlantFormState(mapHarvestPlantToForm(nextPlant));
-    setNewCultivarName('');
+    harvestGroupPlantCrud.setPlantManageMode('edit');
+    harvestGroupPlantCrud.setGroupPlantFormState(mapHarvestPlantToForm(nextPlant, getCultivarName));
+    harvestGroupPlantCrud.setNewCultivarName('');
   };
 
   const handleObservationGroupSelection = (groupId) => {
     if (!groupId) {
       setSelectedHarvestGroupId(null);
       setSelectedPlantId(null);
-      setPlantManageMode('create');
+      harvestGroupPlantCrud.setPlantManageMode('create');
       return;
     }
     selectGroupById(groupId);
@@ -449,14 +254,14 @@ export default function Observations({ onNavigateTo }) {
   const handleObservationPlantSelection = (plantId) => {
     if (!plantId) {
       setSelectedPlantId(null);
-      setPlantManageMode('create');
+      harvestGroupPlantCrud.setPlantManageMode('create');
       return;
     }
 
     const plant = plants.find(item => String(item._id) === String(plantId));
     if (!plant) return;
     setSelectedPlantId(plant._id);
-    setPlantManageMode('edit');
+    harvestGroupPlantCrud.setPlantManageMode('edit');
   };
 
   const cancelNewHarvestGroup = () => {
@@ -473,113 +278,34 @@ export default function Observations({ onNavigateTo }) {
     }
 
     clearMessages();
-    setPlantManageMode('edit');
+    harvestGroupPlantCrud.setPlantManageMode('edit');
     setSelectedPlantId(fallbackPlant._id);
-    setGroupPlantFormState(mapHarvestPlantToForm(fallbackPlant));
-    setNewCultivarName('');
+    harvestGroupPlantCrud.setGroupPlantFormState(mapHarvestPlantToForm(fallbackPlant, getCultivarName));
+    harvestGroupPlantCrud.setNewCultivarName('');
   };
 
-  const handleDeleteObservation = async (observationId) => {
-    if (!window.confirm('Delete this observation? This cannot be undone.')) {
-      return;
-    }
-
-    setFormSubmitting(true);
+  // Wrapper handler for observation deletion with refresh
+  const handleDeleteObservationWithRefresh = async (observationId) => {
     clearMessages();
-
-    try {
-      await requestJson(`/api/observations/${observationId}`, {
-        method: 'DELETE'
-      }, 'Failed to delete observation');
-
-      showCrudSuccess('Observation deleted.');
-      if (editingObservationId === observationId) {
-        resetForm();
-      }
-
-      await refreshSelectionAndObservations({
-        preferredGroupId: selectedHarvestGroup?._id,
-        preferredPlantId: selectedPlant?._id
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setFormSubmitting(false);
-    }
+    await observationCrud.handleDeleteObservation(observationId);
+    await refreshSelectionAndObservations({
+      preferredGroupId: selectedHarvestGroup?._id,
+      preferredPlantId: selectedPlant?._id
+    });
   };
 
-  const handleFormChange = (event) => {
-    const { name, value } = event.target;
-    setFormState(current => ({
-      ...current,
-      [name]: value
-    }));
-  };
-
-  const handleObservationImageChange = (event) => {
-    const file = event.target.files?.[0] || null;
-    setObservationImageFile(file);
-  };
-
-  const handleGroupImageFileChange = (event) => {
-    const file = event.target.files?.[0] || null;
-    setGroupImageFile(file);
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (!selectedPlantId || !selectedHarvestGroup || !selectedPlant) {
-      setError('Select a harvest group and plant before saving.');
-      return;
-    }
-
-    setFormSubmitting(true);
+  // Wrapper handler for observation submit with refresh
+  const handleObservationSubmit = async (event) => {
     clearMessages();
-
-    const isEditing = Boolean(editingObservationId);
-
-    try {
-      let observationImageUrl = formState.observ_img;
-      if (observationImageFile) {
-        observationImageUrl = await uploadImageFile(observationImageFile, 'observation');
-      }
-
-      const payload = buildObservationPayload(
-        {
-          ...formState,
-          observ_img: observationImageUrl
-        },
-        selectedHarvestGroup,
-        selectedPlant
-      );
-
-      await requestJson(
-        isEditing ? `/api/observations/${editingObservationId}` : '/api/observations',
-        {
-          method: isEditing ? 'PUT' : 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        },
-        'Failed to save observation'
-      );
-
-      resetForm();
-      showCrudSuccess(isEditing ? 'Observation updated.' : 'Observation created.');
-
-      await refreshSelectionAndObservations({
-        preferredGroupId: selectedHarvestGroup._id,
-        preferredPlantId: selectedPlant._id
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setFormSubmitting(false);
-    }
+    await observationCrud.handleSubmit(event, selectedPlant, selectedHarvestGroup);
+    await refreshSelectionAndObservations({
+      preferredGroupId: selectedHarvestGroup?._id,
+      preferredPlantId: selectedPlant?._id
+    });
   };
 
-  const handleGroupFormChange = (event) => {
+  // Wrapper for harvest group form change to handle group selection
+  const handleGroupFormChangeWrapper = (event) => {
     const { name, value } = event.target;
 
     if (name === 'group_id') {
@@ -588,113 +314,34 @@ export default function Observations({ onNavigateTo }) {
         return;
       }
       selectGroupById(value);
-    } else if (name === 'har_grp' && groupManageMode === 'create') {
-      setGroupFormState(current => ({
-        ...current,
-        [name]: value
-      }));
-      setNewHarvestGroupKey(value);
+    } else {
+      harvestGroupCrud.handleGroupFormChange(event, name, value);
     }
   };
 
-  const handleCreateHarvestGroup = async (event) => {
-    event.preventDefault();
-
-    setGroupFormSubmitting(true);
+  // Wrapper for harvest group creation with extra logic
+  const handleCreateHarvestGroupWithRefresh = async (event) => {
     clearMessages();
-
-    try {
-      let groupImageUrl = groupFormState.image_url;
-      if (groupImageFile) {
-        groupImageUrl = await uploadImageFile(groupImageFile, 'harvest-group');
-      }
-
-      if (isManagingExistingGroup) {
-        await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            current_room: groupFormState.current_room,
-            notes: groupFormState.notes,
-            image_url: groupImageUrl
-          })
-        }, 'Failed to update harvest group');
-
-        showCrudSuccess(`Harvest group ${selectedHarvestGroup.har_grp} updated.`);
-        await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id, preferredPlantId: selectedPlantId });
-      } else {
-        const harGrpValue = (newHarvestGroupKey || groupFormState.har_grp || '').trim();
-        if (!harGrpValue) {
-          throw new Error('Provide a harvest group key.');
-        }
-
-        const createdGroup = await requestJson('/api/harvest-groups', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            har_grp: harGrpValue,
-            current_room: groupFormState.current_room,
-            notes: groupFormState.notes,
-            image_url: groupImageUrl
-          })
-        }, 'Failed to create harvest group');
-
-        showCrudSuccess(`Harvest group ${createdGroup.har_grp} created.`);
-        await refreshCurrentData({ preferredGroupId: createdGroup._id });
-        setGroupManageMode('edit');
-        setPlantManageMode('create');
-      }
-      setNewHarvestGroupKey('');
-      setGroupImageFile(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGroupFormSubmitting(false);
+    await harvestGroupCrud.handleCreateHarvestGroup(event, isManagingExistingGroup, selectedHarvestGroup, selectedPlantId);
+    if (!isManagingExistingGroup) {
+      harvestGroupCrud.setGroupManageMode('edit');
+      harvestGroupPlantCrud.setPlantManageMode('create');
     }
   };
 
-  const handleDeleteHarvestGroup = async () => {
+  // Wrapper for harvest group deletion
+  const handleDeleteHarvestGroupWithRefresh = async () => {
     if (!isManagingExistingGroup) {
       setError('Select a harvest group to delete.');
       return;
     }
-
-    if (!window.confirm(`Delete harvest group ${selectedHarvestGroup.har_grp}? This will also remove observations in this group.`)) {
-      return;
-    }
-
-    setGroupFormSubmitting(true);
     clearMessages();
-
-    try {
-      await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}`, {
-        method: 'DELETE'
-      }, 'Failed to delete harvest group');
-
-      showCrudSuccess(`Harvest group ${selectedHarvestGroup.har_grp} deleted.`);
-      setGroupFormState(EMPTY_GROUP_FORM);
-      setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
-      setObservations([]);
-      setGroupImageFile(null);
-      const data = await refreshCurrentData({});
-
-      if (data?.resolvedGroup) {
-        setGroupManageMode('edit');
-        setPlantManageMode(data.resolvedPlant ? 'edit' : 'create');
-      } else {
-        setGroupManageMode('create');
-        setPlantManageMode('create');
-        setSelectedHarvestGroupId(null);
-        setSelectedPlantId(null);
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGroupFormSubmitting(false);
-    }
+    await harvestGroupCrud.handleDeleteHarvestGroup(selectedHarvestGroup);
+    setObservations([]);
   };
 
-  const handleGroupPlantFormChange = (event) => {
+  // Wrapper for plant form change to handle plant selection
+  const handleGroupPlantFormChangeWrapper = (event) => {
     const { name, value } = event.target;
 
     if (name === 'plant_id') {
@@ -703,141 +350,41 @@ export default function Observations({ onNavigateTo }) {
         return;
       }
 
-      const plant = plants.find(plant => String(plant._id) === String(value));
+      const plant = plants.find(p => String(p._id) === String(value));
       if (plant) {
         setSelectedPlantId(plant._id);
-        setPlantManageMode('edit');
-        setGroupPlantFormState(mapHarvestPlantToForm(plant));
-        setNewCultivarName('');
+        harvestGroupPlantCrud.setPlantManageMode('edit');
+        harvestGroupPlantCrud.setGroupPlantFormState(mapHarvestPlantToForm(plant, getCultivarName));
+        harvestGroupPlantCrud.setNewCultivarName('');
       }
     } else {
-      setGroupPlantFormState(current => ({
-        ...current,
-        [name]: value
-      }));
+      harvestGroupPlantCrud.handleGroupPlantFormChange(event);
     }
   };
 
-  const handleCreateGroupPlant = async (event) => {
-    event.preventDefault();
-    if (!selectedHarvestGroup) {
-      setError('Select a harvest group before adding plants.');
-      return;
-    }
-
-    setGroupPlantFormSubmitting(true);
+  // Wrapper for plant creation with refresh
+  const handleCreateGroupPlantWithRefresh = async (event) => {
     clearMessages();
-
-    try {
-      if (isManagingExistingPlant) {
-        await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants/${selectedPlant._id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cultivar_name: groupPlantFormState.cultivar_name,
-            strain_name: groupPlantFormState.cultivar_name,
-            plant_count: toOptionalNumber(groupPlantFormState.plant_count) || 1,
-            current_room: groupPlantFormState.current_room,
-            notes: groupPlantFormState.notes
-          })
-        }, 'Failed to update harvest-group plant');
-
-        showCrudSuccess('Plant updated.');
-        await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id, preferredPlantId: selectedPlant._id });
-        setPlantManageMode('edit');
-      } else {
-        const cultivarNameValue = (newCultivarName || groupPlantFormState.cultivar_name || '').trim();
-        if (!cultivarNameValue) {
-          throw new Error('Provide a new cultivar name or select one from the dropdown.');
-        }
-
-        const updatedGroup = await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cultivar_name: cultivarNameValue,
-            strain_name: cultivarNameValue,
-            plant_count: toOptionalNumber(groupPlantFormState.plant_count) || 1,
-            current_room: groupPlantFormState.current_room,
-            notes: groupPlantFormState.notes
-          })
-        }, 'Failed to add plant to harvest group');
-
-        const normalizedCultivarName = cultivarNameValue.toLowerCase();
-        const updatedPlants = Array.isArray(updatedGroup?.plants) ? updatedGroup.plants : [];
-        const createdPlant = [...updatedPlants].reverse().find(plant =>
-          getCultivarName(plant).toLowerCase() === normalizedCultivarName
-        ) || updatedPlants[updatedPlants.length - 1] || null;
-
-        showCrudSuccess('Plant added to harvest group.');
-        await refreshCurrentData({
-          preferredGroupId: selectedHarvestGroup._id,
-          preferredPlantId: createdPlant?._id || null
-        });
-        setPlantManageMode('edit');
-      }
-
-      setNewCultivarName('');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGroupPlantFormSubmitting(false);
+    await harvestGroupPlantCrud.handleCreateGroupPlant(event, isManagingExistingPlant, selectedHarvestGroup, selectedPlant);
+    if (!isManagingExistingPlant) {
+      harvestGroupPlantCrud.setPlantManageMode('edit');
     }
   };
 
-  const handleDeleteGroupPlant = async () => {
+  // Wrapper for plant deletion with refresh
+  const handleDeleteGroupPlantWithRefresh = async () => {
     if (!selectedHarvestGroup || !isManagingExistingPlant) {
       setError('Select a harvest-group plant to delete.');
       return;
     }
-
-    if (!window.confirm(`Delete ${getCultivarName(selectedPlant)} from ${selectedHarvestGroup.har_grp}?`)) {
-      return;
-    }
-
-    setGroupPlantFormSubmitting(true);
     clearMessages();
-
-    try {
-      await requestJson(`/api/harvest-groups/${selectedHarvestGroup._id}/plants/${selectedPlant._id}`, {
-        method: 'DELETE'
-      }, 'Failed to delete harvest-group plant');
-
-      showCrudSuccess('Harvest-group plant deleted.');
-      setGroupPlantFormState(EMPTY_GROUP_PLANT_FORM);
-      resetForm();
-      setObservations([]);
-      const data = await refreshCurrentData({ preferredGroupId: selectedHarvestGroup._id });
-      if (data?.resolvedPlant) {
-        setPlantManageMode('edit');
-      } else {
-        setPlantManageMode('create');
-        setSelectedPlantId(null);
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGroupPlantFormSubmitting(false);
-    }
+    await harvestGroupPlantCrud.handleDeleteGroupPlant(selectedHarvestGroup, selectedPlant);
+    observationCrud.resetForm();
+    setObservations([]);
   };
 
   const latestObservation = observations.length > 0 ? observations[0] : null;
   const groupPlantTotalCount = plants.reduce((total, plant) => total + (Number(plant.plant_count) || 0), 0);
-
-  const handleRetryDbConnection = async () => {
-    setHarvestLoading(true);
-    setError(null);
-
-    try {
-      await loadHarvestGroups({});
-      setDbSetupPopupOpen(false);
-    } catch (err) {
-      setError(err.message);
-      setDbSetupPopupOpen(true);
-    } finally {
-      setHarvestLoading(false);
-    }
-  };
 
   if (harvestLoading) {
     return <div className="observations-empty-state">Loading observation dashboard...</div>;
@@ -858,36 +405,12 @@ export default function Observations({ onNavigateTo }) {
             Retry connection
           </button>
         </div>
-
-        {dbSetupPopupOpen && (
-          <div className="crud-popup-backdrop">
-            <div className="crud-popup-card setup-popup-card">
-              <h3>How to connect Observations</h3>
-              <p>
-                This workspace loads live harvest groups and observations from your API. The data will populate
-                automatically once the backend can connect to MongoDB and your root <code>.env</code> is configured.
-              </p>
-              <ol className="setup-step-list">
-                {DB_SETUP_STEPS.map(step => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-              <div className="setup-env-block">
-                <p className="crud-popup-subtext">Example .env</p>
-                <pre>{`MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>/grimlock\nPORT=5000\nLOCAL_ADMIN_TOKEN=change-me-local-admin\nOBSERVATION_WRITE_TOKEN=change-me-observation-write\nOBSERVATION_SECURE_READS=false`}</pre>
-              </div>
-              <p className="crud-popup-subtext">Current error: {error}</p>
-              <div className="observations-setup-actions">
-                <button className="primary-btn" type="button" onClick={handleRetryDbConnection}>
-                  Retry connection
-                </button>
-                <button className="ghost-btn" type="button" onClick={() => setDbSetupPopupOpen(false)}>
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <DatabaseSetupPopup
+          open={dbSetupPopupOpen}
+          error={error}
+          onRetry={handleRetryDbConnection}
+          onClose={() => setDbSetupPopupOpen(false)}
+        />
       </div>
     );
   }
@@ -1028,18 +551,18 @@ export default function Observations({ onNavigateTo }) {
                   ) : (
                     <>
                       <ObservationEditorForm
-                        editingObservationId={editingObservationId}
+                        editingObservationId={observationCrud.editingObservationId}
                         selectedPlant={selectedPlant}
                         selectedHarvestGroup={selectedHarvestGroup}
-                        formState={formState}
-                        onFormChange={handleFormChange}
-                        onObservationImageChange={handleObservationImageChange}
-                        observationImageFile={observationImageFile}
-                        observationImagePreviewUrl={observationImagePreviewUrl}
+                        formState={observationCrud.formState}
+                        onFormChange={observationCrud.handleFormChange}
+                        onObservationImageChange={observationCrud.handleObservationImageChange}
+                        observationImageFile={observationCrud.observationImageFile}
+                        observationImagePreviewUrl={observationCrud.observationImagePreviewUrl}
                         resolveImageUrl={resolveImageUrl}
-                        formSubmitting={formSubmitting}
-                        onSubmit={handleSubmit}
-                        onReset={resetForm}
+                        formSubmitting={observationCrud.formSubmitting}
+                        onSubmit={handleObservationSubmit}
+                        onReset={observationCrud.resetForm}
                       />
 
                       {observationsLoading ? (
@@ -1063,9 +586,9 @@ export default function Observations({ onNavigateTo }) {
                               groupPlantTotalCount={groupPlantTotalCount}
                               latestObservation={latestObservation}
                               resolveImageUrl={resolveImageUrl}
-                              onEdit={handleEditObservation}
-                              onDelete={handleDeleteObservation}
-                              formSubmitting={formSubmitting}
+                              onEdit={observationCrud.handleEditObservation}
+                              onDelete={handleDeleteObservationWithRefresh}
+                              formSubmitting={observationCrud.formSubmitting}
                             />
                           ))}
                         </div>
@@ -1082,18 +605,18 @@ export default function Observations({ onNavigateTo }) {
                     selectedHarvestGroup={selectedHarvestGroup}
                     selectedHarvestGroupId={selectedHarvestGroupId}
                     harvestGroups={harvestGroups}
-                    groupFormState={groupFormState}
-                    groupFormSubmitting={groupFormSubmitting}
-                    groupImageFile={groupImageFile}
-                    groupImagePreviewUrl={groupImagePreviewUrl}
+                    groupFormState={harvestGroupCrud.groupFormState}
+                    groupFormSubmitting={harvestGroupCrud.groupFormSubmitting}
+                    groupImageFile={harvestGroupCrud.groupImageFile}
+                    groupImagePreviewUrl={harvestGroupCrud.groupImagePreviewUrl}
                     resolveImageUrl={resolveImageUrl}
                     onStartNewHarvestGroup={startNewHarvestGroup}
                     onCancelNewHarvestGroup={cancelNewHarvestGroup}
-                    onGroupFormChange={handleGroupFormChange}
-                    onGroupFormSubmit={handleCreateHarvestGroup}
-                    onDeleteHarvestGroup={handleDeleteHarvestGroup}
-                    onGroupImageFileChange={handleGroupImageFileChange}
-                    setGroupFormState={setGroupFormState}
+                    onGroupFormChange={handleGroupFormChangeWrapper}
+                    onGroupFormSubmit={handleCreateHarvestGroupWithRefresh}
+                    onDeleteHarvestGroup={handleDeleteHarvestGroupWithRefresh}
+                    onGroupImageFileChange={harvestGroupCrud.handleGroupFormChange}
+                    setGroupFormState={harvestGroupCrud.setGroupFormState}
                   />
 
                   <HarvestGroupPlantForm
@@ -1102,13 +625,13 @@ export default function Observations({ onNavigateTo }) {
                     selectedPlant={selectedPlant}
                     isManagingExistingPlant={isManagingExistingPlant}
                     selectedPlantId={selectedPlantId}
-                    groupPlantFormState={groupPlantFormState}
-                    newCultivarName={newCultivarName}
-                    groupPlantFormSubmitting={groupPlantFormSubmitting}
-                    onGroupPlantFormChange={handleGroupPlantFormChange}
-                    onSetNewCultivarName={setNewCultivarName}
-                    onCreateGroupPlant={handleCreateGroupPlant}
-                    onDeleteGroupPlant={handleDeleteGroupPlant}
+                    groupPlantFormState={harvestGroupPlantCrud.groupPlantFormState}
+                    newCultivarName={harvestGroupPlantCrud.newCultivarName}
+                    groupPlantFormSubmitting={harvestGroupPlantCrud.groupPlantFormSubmitting}
+                    onGroupPlantFormChange={handleGroupPlantFormChangeWrapper}
+                    onSetNewCultivarName={harvestGroupPlantCrud.setNewCultivarName}
+                    onCreateGroupPlant={handleCreateGroupPlantWithRefresh}
+                    onDeleteGroupPlant={handleDeleteGroupPlantWithRefresh}
                     onStartNewPlant={startNewPlant}
                     onCancelNewPlant={cancelNewPlant}
                   />

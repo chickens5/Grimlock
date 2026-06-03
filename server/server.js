@@ -7,7 +7,6 @@ import path from 'path';
 import plantRoutes from './routes/plants.js';
 import observationRoutes from './routes/observations.js';
 import harvestGroupRoutes from './routes/harvest-groups.js';
-import labResultRoutes from './routes/lab-results.js';
 import mlDatasetRoutes from './routes/ml-datasets.js';
 import uploadsRoutes from './routes/uploads.js';
 
@@ -48,14 +47,34 @@ mongoose.connect(mongoUri)
   .then(() => console.log('✓ MongoDB connected'))
   .catch(err => {
     console.error('✗ MongoDB connection error:', err.message);
-    process.exit(1);
+    console.error('⚠ API is running in setup mode. Configure MONGODB_URI to enable data routes.');
   });
+
+// Return a clear setup response when API routes are hit before MongoDB connects.
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') {
+    next();
+    return;
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    res.status(503).json({
+      message: 'Database not connected. Configure MONGODB_URI in .env and restart the server.',
+      setup: {
+        requiredEnv: ['MONGODB_URI'],
+        optionalEnv: ['LOCAL_ADMIN_TOKEN', 'OBSERVATION_WRITE_TOKEN', 'OBSERVATION_READ_TOKEN', 'OBSERVATION_SECURE_READS']
+      }
+    });
+    return;
+  }
+
+  next();
+});
 
 // Routes
 app.use('/api/plants', plantRoutes);
 app.use('/api/observations', observationRoutes);
 app.use('/api/harvest-groups', harvestGroupRoutes);
-app.use('/api/lab-results', labResultRoutes);
 app.use('/api/ml-datasets', mlDatasetRoutes);
 app.use('/api/uploads', uploadsRoutes);
 

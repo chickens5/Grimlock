@@ -1,7 +1,6 @@
 import MLDataset from '../models/MLDataset.js';
 import Plant from '../models/Plant.js';
 import Observation from '../models/Observation.js';
-import LabResult from '../models/LabResult.js';
 
 const DEFAULT_SCORE_WEIGHTS = {
   cbd: 0.4,
@@ -132,11 +131,11 @@ async function buildCultivarRows({ strainStatus }) {
   const plantFilter = {};
   if (strainStatus) plantFilter.strain_status = strainStatus;
 
-  const [plants, observations, labResults] = await Promise.all([
+  const [plants, observations] = await Promise.all([
     Plant.find(plantFilter).lean(),
-    Observation.find({}).lean(),
-    LabResult.find({}).lean()
+    Observation.find({}).lean()
   ]);
+  const labResults = [];
 
   const observationsByPlantId = new Map();
   observations.forEach(obs => {
